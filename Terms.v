@@ -28,8 +28,6 @@ Inductive term : Type :=
 | Location : loc -> term
 | Union : list (Prop * term) -> term.
 
-Reserved Notation "x =s= y" (at level 50).
-
 Fixpoint All {X : Type} (p : X -> Prop) (l : list X) : Prop :=
   match l with
   | [] => True
@@ -48,114 +46,68 @@ Fixpoint Union_app (ts : term) (g : Prop) (x : term) : term :=
   | ts => Union []
   end.
 
-Inductive sem_empty : term -> Prop :=
-| sem_empty_nil: sem_empty (Union [])
-| sem_empty_cons_empty: forall (t ts : term) (g : Prop),
-    sem_empty t -> sem_empty ts -> sem_empty (Union_app ts g t)
-| sem_empty_cons_false_guard: forall (t ts : term) (g : Prop),
-    ~ g -> sem_empty ts -> sem_empty (Union_app ts g t)
+Inductive empty_union : term -> Prop :=
+| empty_union_nil: empty_union (Union [])
+| empty_union_cons_empty: forall (t ts : term) (g : Prop),
+    empty_union t -> empty_union ts -> empty_union (Union_app ts g t)
+| empty_union_cons_false_guard: forall (t ts : term) (g : Prop),
+    ~ g -> empty_union ts -> empty_union (Union_app ts g t)
 .
 
-Lemma sem_empty_not_theory : forall (t : th), ~ sem_empty (Theory t).
+Lemma empty_union_not_theory : forall (t : th), ~ empty_union (Theory t).
 Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
 
-Lemma sem_empty_not_location : forall (l : loc), ~ sem_empty (Location l).
+Lemma empty_union_not_location : forall (l : loc), ~ empty_union (Location l).
 Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
 
-Fixpoint sem_equal (t1 : term) :=
-  fix sem_equal1 (t2 : term) :=
-    sem_empty t1 /\
-    sem_empty t2
-    \/ match t1 with
-       | Union l =>
-         fold_left (fun disj x => match x with (p, t) => disj \/ p /\ (sem_equal t t2) end) l False
-       | _ =>
-         match t2 with
-         | Union l =>
-           Any (fun x => match x with (p, t) => p /\ sem_equal1 t end) l (*
-           fold_right (fun x disj => match x with (p, t) => disj \/ p /\ (sem_equal1 t) end) False l*)
-           (*fold_left (fun disj x => match x with (p, t) => disj \/ p /\ (sem_equal1 t) end) l False *)
-         | _ => t1 = t2
-         end
-       end
-where "x =s= y" := (sem_equal x y).
+Reserved Notation "x =s= y" (at level 50).
 
-Lemma union_uncons_l : forall (g : Prop) (t x : term) (l : GuardedValues),
-    g /\ t =s= x \/ Union l =s= x <-> Union ((g, t) :: l) =s= x.
-Proof. admit. Admitted.
+Inductive semantically_equal : relation term :=
+(*| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
+| semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2*)
+(*| semeq_symm : forall (t1 t2 : term), t1 =s= t2 -> t2 =s= t1*)
+| semeq_unionr : forall (t : term) (l : list (Prop * term)), union_equal empty_union t (Union l) -> t =s= Union l
+| semeq_unionl : forall (t : term) (l : list (Prop * term)), union_equal empty_union t (Union l) -> Union l =s= t
+| semeq_eq : forall (t1 t2 : term), t1 = t2 -> t1 =s= t2
+where "x =s= y" := (semantically_equal x y)
+with union_equal : (term -> Prop) -> relation term :=
+| uneq_nil : forall (isempty : term -> Prop) (x : term), isempty x -> union_equal isempty x (Union [])
+| uneq_cons_false : forall (isempty : term -> Prop) (x v : term) (g : Prop) (gvs : list (Prop * term)),
+  ~ g -> union_equal isempty x (Union gvs) -> union_equal isempty x (Union ((g, v) :: gvs))
+| uneq_cons_true : forall (isempty : term -> Prop) (x v : term) (g : Prop) (gvs : list (Prop * term)),
+  g -> x =s= v -> union_equal (fun _ => True) x (Union gvs) -> union_equal isempty x (Union ((g, v) :: gvs))
+.
 
-Lemma union_uncons_r : forall (g : Prop) (t x : term) (l : GuardedValues),
-    x =s= Union ((g, t) :: l) <-> g /\ t =s= x \/ x =s= Union l.
-Proof. admit. Admitted.
-
-Ltac sem_empty_simpl :=
-  try match goal with
-      | [ H : sem_empty (Theory _) |- _ ] => apply sem_empty_not_theory in H; tauto
-      | [ H : sem_empty (Location _) |- _ ] => apply sem_empty_not_location in H; tauto
-      end.
-
-Ltac semeq_simpl :=
-  try match goal with
-  | [ H : Theory _ =s= Theory _ |- _ ] =>
-    destruct H as [[?A ?B] | ?C]; sem_empty_simpl; inversion_clear C
-  | [ H : Location _ =s= Location _ |- _ ] =>
-    destruct H as [[?A ?B] | ?C]; sem_empty_simpl; inversion_clear C
-  | [ H : Location _ =s= Theory _ |- _ ] =>
-    destruct H as [[?A _] | ?C]; sem_empty_simpl; inversion C
-  | [ H : Theory _ =s= Location _ |- _ ] =>
-    destruct H as [[_ ?A] | ?C]; sem_empty_simpl; inversion C
-  | [ H : Theory _ =s= Union [] |- _ ] =>
-    inversion_clear H as [[?A _] | ?C]; sem_empty_simpl
-  | [ H : Location _ =s= Union [] |- _ ] =>
-    inversion_clear H as [[?A _] | ?C]; sem_empty_simpl
-  | [ H : Union [] =s= Theory _ |- _ ] =>
-    inversion_clear H as [[_ ?A] | ?C]; sem_empty_simpl
-  | [ H : Union [] =s= Location _ |- _ ] =>
-    inversion_clear H as [[_ ?A] | ?C]; sem_empty_simpl
-  end;
-try (simpl; tauto).
-
-Lemma semeq_theories : forall (t1 t2 : th), t1 = t2 <-> Theory t1 =s= Theory t2.
-Proof. intros. split; intros; subst; simpl; auto. semeq_simpl. Qed.
-
-Lemma semeq_locations : forall (l1 l2 : loc), l1 = l2 <-> Location l1 =s= Location l2.
-Proof. intros. split; intros; subst; simpl; auto. semeq_simpl. Qed.
-
-Lemma semeq_IsSymm : Symmetric sem_equal.
-Proof. unfold Symmetric. intros. destruct x, y; semeq_simpl.
-       - induction g. semeq_simpl. destruct a. apply union_uncons_l. apply union_uncons_r in H.
-         destruct H; auto.
-       - induction g. semeq_simpl. destruct a. apply union_uncons_l. apply union_uncons_r in H.
-         destruct H; auto.
-       - induction g. semeq_simpl. destruct a. apply union_uncons_r. apply union_uncons_l in H.
-         destruct H; auto.
-       - induction g. semeq_simpl. destruct a. apply union_uncons_r. apply union_uncons_l in H.
-         destruct H; auto.
-       - induction g0.
-         + simpl. left. split. constructor. inversion H as [[A _] | C]. assumption.
-       - induction g.
-         + simpl in *. destruct H as [[_ B] | C].
-           * left. split. assumption. constructor.
-           * admit.
-         + 
-
-Lemma kek : forall (g : Prop) (t' trm : term) (l : GuardedValues),
-    fold_left (fun disj x => match x with (p, t) => disj \/ p /\ (t =s= t') end) ((g, trm) :: l) False = fold_left (fun disj x => match x with (p, t) => disj \/ p /\ (t =s= t') end) l False \/ g /\ trm =s= t'.
-Proof. intros. simpl. admit. Admitted.
-
-Lemma union_cons_simpl : forall (g : Prop) (t x : term) (gv : GuardedValues),
-    Union ((g, t) :: gv) =s= x -> Union gv =s= x \/ g /\ t =s= x.
-Proof. intros. unfold semantically_equal in H; fold semantically_equal in H. simpl in H.
-       simpl. admit. Admitted.
-
-Lemma semeq_IsRefl : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. destruct x. simpl; auto. simpl; auto.
-       induction g. simpl; auto. unfold semantically_equal; fold semantically_equal.
-       replace (a :: g) with ([a] ++ g); auto. rewrite fold_left_app.
-       simpl. destruct a. admit. Admitted.
+Lemma empty_test : forall (x : term), Union [] =s= Union [(False, x)].
+Proof. intro x. repeat constructor. tauto. Qed.
 
 
-(* ----------------------------------Meaningfull lemmas-------------------------------------- *)
+(* ----------------------------------Relation lemmas-------------------------------------- *)
+Instance union_equal_empty_is_reflexive : Reflexive (union_equal empty_union).
+Proof. unfold Reflexive. intro x. admit. Admitted.
 
+
+Instance semeq_is_reflexive : Reflexive semantically_equal.
+Proof. unfold Reflexive. intro x. destruct x; try repeat constructor. reflexivity. Qed.
+
+
+
+(* ----------------------------------Properties lemmas-------------------------------------- *)
 Lemma union_True : forall (t : term), Union [(True, t)] =s= t.
-Proof. intro t. simpl. right. split; auto. apply semeq_IsRefl. Qed.
+Proof. intro t. constructor. apply uneq_cons_true.
+  - constructor.
+  - reflexivity.
+  - repeat constructor.
+Qed.
+
+Lemma union_false_erasing : forall (t : term) (gvs : list (Prop * term)), Union ((False, t) :: gvs) =s= Union gvs.
+Proof. intros t gvs. apply semeq_unionr. apply uneq_cons_false; auto. reflexivity. Qed.
+
+Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
+  Union ((g, Union xgvs) :: ygvs) =s= Union (map (fun x => match x with (g', v) => (g /\ g', v) end) xgvs ++ ygvs).
+Proof. intros g xgvs ygvs. admit. Admitted.
+
+Lemma union_same_value : forall (g1 g2 : Prop) (v : term) (gvs : list (Prop * term)),
+  Union ((g1, v) :: (g2, v) :: gvs) =s= Union ((g1 \/ g2, v) :: gvs).
+Proof. intros g1 g2 v gvs. induction gvs.
+  - 
