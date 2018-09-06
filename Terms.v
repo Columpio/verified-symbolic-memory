@@ -28,24 +28,6 @@ Inductive term : Type :=
 | Location : loc -> term
 | Union : list (Prop * term) -> term.
 
-Fixpoint All {X : Type} (p : X -> Prop) (l : list X) : Prop :=
-  match l with
-  | [] => True
-  | (x :: xs) => p x /\ All p xs
-  end.
-
-Fixpoint Any {X : Type} (p : X -> Prop) (l : list X) : Prop :=
-  match l with
-  | [] => False
-  | (x :: xs) => p x \/ Any p xs
-  end.
-
-Fixpoint Union_app (ts : term) (g : Prop) (x : term) : term :=
-  match ts with
-  | Union l => Union ((g, x) :: l)
-  | ts => Union []
-  end.
-
 Fixpoint disjunct (gvs : list (Prop * term)) : Prop :=
   match gvs with
   | [] => False
@@ -55,7 +37,7 @@ Fixpoint disjunct (gvs : list (Prop * term)) : Prop :=
 Inductive empty_union : term -> Prop :=
 | empty_union_nil: empty_union (Union [])
 | empty_union_cons_empty: forall (g : Prop) (t : term) (ts : list (Prop * term)),
-    empty_union t -> empty_union (Union ts) -> empty_union (Union ((g, t) :: ts))
+    g -> empty_union t -> empty_union (Union ts) -> empty_union (Union ((g, t) :: ts))
 | empty_union_cons_false_guard: forall (g : Prop) (t : term) (ts : list (Prop * term)),
     ~ g -> empty_union (Union ts) -> empty_union (Union ((g, t) :: ts))
 .
@@ -75,34 +57,79 @@ Inductive semantically_equal : relation term :=
 (*| semeq_symm : forall (t1 t2 : term), t1 =s= t2 -> t2 =s= t1*)
 | semeq_unionr : forall (t : term) (l : list (Prop * term)), t =u= Union l -> t =s= Union l
 | semeq_unionl : forall (t : term) (l : list (Prop * term)), t =u= Union l -> Union l =s= t
-| semeq_eq : forall (t1 t2 : term), t1 = t2 -> t1 =s= t2
+| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
+| semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
 where "x =s= y" := (semantically_equal x y)
-with union_equal : (term -> Prop) -> relation term :=
-| uneq_nil : forall (isempty : term -> Prop) (x : term), isempty x -> union_equal isempty x (Union [])
+with union_equal_with_empty : (term -> Prop) -> relation term :=
+| uneq_th : forall (isempty : term -> Prop) (theory : th) (gvs : list (Prop * term)),
+  union_equal isempty (Theory theory) (Union gvs) -> union_equal isempty (Union gvs) (Theory theory)
+| uneq_loc : forall (isempty : term -> Prop) (location : loc) (gvs : list (Prop * term)),
+  union_equal isempty (Location location) (Union gvs) -> union_equal isempty (Union gvs) (Location location)
+| uneq_nil : forall (isempty : term -> Prop) (x : term) (*(gvs : list (Prop * term))*),
+  (*~ disjunct gvs -> *)isempty x -> union_equal isempty x (Union [])
 | uneq_cons : forall (isempty : term -> Prop) (x v : term) (g : Prop) (gvs : list (Prop * term)),
-  (g \/ disjunct gvs) /\
-  ((~ g -> union_equal isempty x (Union gvs)) \/
-   (g -> x =s= v /\ union_equal (fun _ => True) x (Union gvs))) -> union_equal isempty x (Union ((g, v) :: gvs))
+  (*(g \/ disjunct gvs) /\*)
+  (~ g /\            union_equal isempty         x (Union gvs) \/
+     g /\ x =s= v /\ union_equal (fun _ => True) v (Union gvs)) -> union_equal isempty x (Union ((g, v) :: gvs))
 where "x =u= y" := (union_equal empty_union x y)
+with union_equal_nil : relation term :=
+| uneqnil_nil : forall (x : term), uneqnil x (Union [])
+| uneqnil_cons : forall (x v : term) (g : Prop) (gvs : list (Prop * term)),
+  (~ g /\         union_equal isempty         x (Union gvs) \/
+  g /\ x =s= v /\ union_equal (fun _ => True) v (Union gvs)) -> union_equal isempty x (Union ((g, v) :: gvs))
 .
 
-Lemma empty_test : forall (x : term), Union [] =s= Union [(False, x)].
-Proof. intro x. apply semeq_unionl. constructor. apply empty_union_cons_false_guard. tauto. constructor. Qed.
-
-
+Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
+Proof. intro x. apply semeq_unionl. constructor. apply empty_union_cons_false_guard. tauto. constructor.
+Qed.
 
 
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
-Instance union_equal_empty_is_reflexive : Reflexive (union_equal empty_union).
-Proof. unfold Reflexive. intro x. admit. Admitted.
+Theorem union_eq_symmetric : forall (gvs1 gvs2 : list (Prop * term)),
+  Union gvs1 =u= Union gvs2 -> Union gvs2 =u= Union gvs1.
+Proof. intros. induction H; auto.
+  - induction x; try repeat constructor; auto. 
+  admit. Admitted.
+
+Instance union_equal_empty_is_symmetric : Symmetric (union_equal empty_union).
+Proof. unfold Symmetric. intros x y Hxy. destruct y; destruct x.
+  - inversion Hxy.
+  - inversion Hxy.
+  - inversion_clear Hxy; assumption.
+  - inversion Hxy.
+  - inversion Hxy.
+  - inversion_clear Hxy; assumption.
+  - constructor; assumption.
+  - constructor; assumption.
+  - apply union_eq_symmetric. assumption.
+Qed.
+
+Theorem semeq_left_part : forall (g : Prop) (t : term) (gvs : list (Prop * term)),
+  ~g -> Union gvs =u= Union gvs -> Union gvs =u= Union ((g, t) :: gvs).
+Proof. intros. constructor. tauto. Qed.
+
+Theorem semeq_right_part : forall (g : Prop) (t : term) (gvs : list (Prop * term)),
+  g -> Union gvs =u= Union gvs -> t =u= Union ((g, t) :: gvs) /\ union_equal (fun _ : term => True) t (Union gvs).
+Proof. intros. split.
+  - constructor. right.
 
 Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. destruct x; try repeat constructor. reflexivity. Qed.
-
-Instance unino_equal_empty_is_symmetric : Symmetric (union_equal empty_union).
-Proof. unfold Symmetric. intros x y Hxy. admit. Admitted.
+Proof. unfold Reflexive. intro x.
+  induction semantically_equal.
   
+  
+  destruct x; try repeat constructor. induction l.
+  - repeat constructor.
+  - destruct a as [g t]. constructor.
+    assert (H: ~ g /\ Union l =u= Union ((g, t) :: l)
+      \/ g /\ t =u= Union ((g, t) :: l) /\ union_equal (fun _ : term => True) t (Union l)).
+    { admit. }
+    destruct H as [[Hng Hu] | [Hg [Ht Hu]]].
+    + left; split; try tauto. symmetry. assumption.
+    + right; split; try tauto. split. constructor. assumption. assumption.
+Qed.
+
 Instance semeq_is_symmetric : Symmetric semantically_equal.
 Proof. unfold Symmetric. intros x y Hxy. destruct x; destruct y; inversion_clear Hxy; admit. Admitted.
 
@@ -111,6 +138,31 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. admit. Admitted.
 
 Instance semeq_is_transitive : Transitive semantically_equal.
 Proof. unfold Transitive. intros x y z Hxy Hyz. destruct x; destruct y; inversion_clear Hxy; admit. Admitted.
+
+
+Example singles_test : forall (g1 g2 : Prop) (v1 v2 : term),
+Union [(g1, v1)] =u= Union [(g2, v2)] <->
+~g1 /\ ~g2 \/
+ g1 /\ ~g2 /\ empty_union v1 \/
+~g1 /\  g2 /\ empty_union v2 \/
+ g1 /\  g2 /\ v1 =s= v2.
+Proof. intros. split; intro.
+- inversion_clear H; simpl in *. inversion_clear H0; inversion_clear H; inversion_clear H1.
+  + inversion_clear H; tauto.
+  + right; right. symmetry in H. inversion_clear H.
+    * inversion_clear H1; inversion_clear H.
+      ** left. repeat split; try tauto. inversion_clear H1. inversion_clear H3. assumption.
+      ** right. repeat split; try tauto. destruct H1 as [_ [H _]]. symmetry. assumption.
+    * symmetry in H1. inversion_clear H1. inversion_clear H.
+      ** left. repeat split; try tauto. inversion_clear H1. inversion_clear H3. assumption.
+      ** right. repeat split; try tauto. destruct H1 as [_ [H _]]. symmetry. assumption.
+- constructor. destruct H as [[Hng1 Hng2] | [[Hg1 [Hng2 Hev1]] | [[Hng1 [Hg2 Hev2]] | [Hg1 [Hg2 Heq]]]]].
+  + left; split; try tauto. constructor. apply empty_union_cons_false_guard. tauto. constructor.
+  + left; split; try tauto. constructor. apply empty_union_cons_empty. tauto. assumption. constructor.
+  + right; split; try tauto. split; constructor; try tauto. constructor. left. split; try tauto. constructor. assumption.
+  + right; split; try tauto. split; constructor; try tauto. constructor. right. split; try tauto.
+    split. symmetry. assumption. constructor. tauto.
+Qed.
 
 
 (* ----------------------------------Technical lemmas-------------------------------------- *)
@@ -152,8 +204,9 @@ Proof. admit. Admitted.
 
 Lemma union_same_value : forall (g1 g2 : Prop) (v : term) (gvs : list (Prop * term)),
   Union ((g1, v) :: (g2, v) :: gvs) =s= Union ((g1 \/ g2, v) :: gvs).
-Proof. intros g1 g2 v gvs. induction gvs.
-  - apply union_Sequal_split. intro x. split; intro H; constructor; inversion_clear H;
+Proof. intros g1 g2 v gvs. induction gvs; apply union_Sequal_split; intro x.
+  - split; intro H; constructor; inversion_clear H;
     try (subst; apply union_same_value_lr; auto); solve [reflexivity | symmetry; assumption].
-  - 
+  - split; intro H.
+    + constructor. inversion_clear H.
 Qed.
