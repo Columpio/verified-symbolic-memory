@@ -91,22 +91,41 @@ Qed.
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Lemma u_hence_neu : forall (gvs1 gvs2 : list (Prop * term)),
   Union gvs1 =u= Union gvs2 -> Union gvs1 =neu= Union gvs2.
-Proof. intros. induction gvs2 as [| (g, v)].
-  - inversion_clear H. constructor.
-  - constructor. inversion_clear H. tauto.
-Qed.
+Proof. intros. induction gvs2 as [| (g, v)]; inversion_clear H; constructor. tauto. Qed.
+
+Lemma empty_eq_neu : forall (gvs : list (Prop * term)), empty_union (Union gvs) <-> Union [] =neu= Union gvs.
+Proof. admit. Admitted.
+
+Lemma u_to_empty : forall (gvs : list (Prop * term)), Union [] =u= Union gvs -> empty_union (Union gvs).
+Proof. admit. Admitted.
 
 Theorem union_eq_symmetric : forall (gvs1 gvs2 : list (Prop * term)),
   Union gvs1 =u= Union gvs2 -> Union gvs2 =u= Union gvs1.
-Proof. intros. remember (Union gvs1). induction H; subst; auto.
+Proof. intros. induction gvs1 as [| (g, v)]; constructor.
+  - induction gvs2 as [| (g, v)].
+    + now inversion_clear H.
+    + inversion_clear H. intuition.
+      * apply empty_union_cons_false_guard; tauto.
+      * apply empty_union_cons_empty; try tauto.
+        ** inversion_clear H. auto using u_to_empty. now inversion_clear H1.
+        ** now apply empty_eq_neu.
+  - inversion H; subst. admit. intuition. 
+  
+  (* induction gvs2 as [| (g, v)].
+  - inversion_clear H. induction H0; constructor.
+    + constructor.
+    + right; intuition. now repeat constructor. auto using neu_empty.
+    + tauto.
+  - *)
+  
+  (*remember (Union gvs1). induction H; subst; auto.
   - induction H; constructor.
     + constructor.
     + right. intuition.
       * now repeat constructor.
       * inversion_clear IHempty_union2; constructor. intuition auto using u_hence_neu.
     + tauto.
-  - intuition. 
-  admit. Admitted.
+  - intuition. admit. Admitted.*)
 
 Instance union_equal_empty_is_symmetric : Symmetric (union_equal empty_union).
 Proof. unfold Symmetric. intros x y Hxy. destruct y; destruct x.
