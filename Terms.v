@@ -50,6 +50,7 @@ Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
 
 Reserved Notation "x =s= y" (at level 50).
 Reserved Notation "x =u= y" (at level 50).
+Reserved Notation "x =neu= y" (at level 50).
 
 Inductive semantically_equal : relation term :=
 (*| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
@@ -60,24 +61,26 @@ Inductive semantically_equal : relation term :=
 | semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
 | semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
 where "x =s= y" := (semantically_equal x y)
-with union_equal_with_empty : (term -> Prop) -> relation term :=
-| uneq_th : forall (isempty : term -> Prop) (theory : th) (gvs : list (Prop * term)),
-  union_equal isempty (Theory theory) (Union gvs) -> union_equal isempty (Union gvs) (Theory theory)
-| uneq_loc : forall (isempty : term -> Prop) (location : loc) (gvs : list (Prop * term)),
-  union_equal isempty (Location location) (Union gvs) -> union_equal isempty (Union gvs) (Location location)
-| uneq_nil : forall (isempty : term -> Prop) (x : term) (*(gvs : list (Prop * term))*),
-  (*~ disjunct gvs -> *)isempty x -> union_equal isempty x (Union [])
-| uneq_cons : forall (isempty : term -> Prop) (x v : term) (g : Prop) (gvs : list (Prop * term)),
+with union_equal_with_empty : relation term :=
+| uneq_th : forall (theory : th) (gvs : list (Prop * term)),
+  Theory theory =u= Union gvs -> Union gvs =u= Theory theory
+| uneq_loc : forall (location : loc) (gvs : list (Prop * term)),
+  Location location =u= Union gvs -> Union gvs =u= Location location
+| uneq_nil : forall (x : term) (*(gvs : list (Prop * term))*),
+  (*~ disjunct gvs -> *) empty_union x -> x =u= Union []
+| uneq_cons : forall (x v : term) (g : Prop) (gvs : list (Prop * term)),
   (*(g \/ disjunct gvs) /\*)
-  (~ g /\            union_equal isempty         x (Union gvs) \/
-     g /\ x =s= v /\ union_equal (fun _ => True) v (Union gvs)) -> union_equal isempty x (Union ((g, v) :: gvs))
-where "x =u= y" := (union_equal empty_union x y)
-with union_equal_nil : relation term :=
-| uneqnil_nil : forall (x : term), uneqnil x (Union [])
+  (~ g /\            x =u= Union gvs \/
+     g /\ x =s= v /\ x =neu= Union gvs) -> x =u= Union ((g, v) :: gvs)
+where "x =u= y" := (union_equal_with_empty x y)
+with union_equal_not_empty : relation term :=
+| uneqnil_nil : forall (x : term), x =neu= Union []
 | uneqnil_cons : forall (x v : term) (g : Prop) (gvs : list (Prop * term)),
-  (~ g /\         union_equal isempty         x (Union gvs) \/
-  g /\ x =s= v /\ union_equal (fun _ => True) v (Union gvs)) -> union_equal isempty x (Union ((g, v) :: gvs))
+    x =neu= Union gvs /\ (~ g \/ g /\ x =s= v) -> x =neu= Union ((g, v) :: gvs)
+where "x =neu= y" := (union_equal_not_empty x y)
 .
+
+
 
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
 Proof. intro x. apply semeq_unionl. constructor. apply empty_union_cons_false_guard. tauto. constructor.
@@ -86,10 +89,23 @@ Qed.
 
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
+Lemma u_hence_neu : forall (gvs1 gvs2 : list (Prop * term)),
+  Union gvs1 =u= Union gvs2 -> Union gvs1 =neu= Union gvs2.
+Proof. intros. induction gvs2 as [| (g, v)].
+  - inversion_clear H. constructor.
+  - constructor. inversion_clear H. tauto.
+Qed.
+
 Theorem union_eq_symmetric : forall (gvs1 gvs2 : list (Prop * term)),
   Union gvs1 =u= Union gvs2 -> Union gvs2 =u= Union gvs1.
-Proof. intros. induction H; auto.
-  - induction x; try repeat constructor; auto. 
+Proof. intros. remember (Union gvs1). induction H; subst; auto.
+  - induction H; constructor.
+    + constructor.
+    + right. intuition.
+      * now repeat constructor.
+      * inversion_clear IHempty_union2; constructor. intuition auto using u_hence_neu.
+    + tauto.
+  - intuition. 
   admit. Admitted.
 
 Instance union_equal_empty_is_symmetric : Symmetric (union_equal empty_union).
