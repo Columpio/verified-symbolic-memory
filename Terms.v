@@ -2,6 +2,7 @@ Require Export Id.
 Require Import Coq.Relations.Relation_Definitions.
 Require Import Coq.Classes.RelationClasses.
 Require Import Coq.Lists.List.
+(* From QuickChick Require Import QuickChick. *)
 Import List.ListNotations.
 
 Variable op : Type.
@@ -61,10 +62,14 @@ Inductive semantically_equal : relation term :=
 | semeq_union : forall (gvs1 gvs2 : list (Prop * term)), Union gvs1 =u= Union gvs2 -> Union gvs1 =s= Union gvs2
 | semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
 | semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
-| semeq_th_u : forall (th1 : th) (gvs : list (Prop * term)),
+| semeq_th_u_l : forall (th1 : th) (gvs : list (Prop * term)),
   Theory th1 =lu= Union gvs -> Theory th1 =s= Union gvs
-| semeq_loc_u : forall (loc1 : loc) (gvs : list (Prop * term)),
+| semeq_th_u_r : forall (th1 : th) (gvs : list (Prop * term)),
+  Theory th1 =lu= Union gvs -> Union gvs =s= Theory th1
+| semeq_loc_u_l : forall (loc1 : loc) (gvs : list (Prop * term)),
   Location loc1 =lu= Union gvs -> Location loc1 =s= Union gvs
+| semeq_loc_u_r : forall (loc1 : loc) (gvs : list (Prop * term)),
+  Location loc1 =lu= Union gvs -> Union gvs =s= Location loc1
 where "x =s= y" := (semantically_equal x y)
 with union_equal_linear : relation term :=
 | uneql : forall (g : Prop) (x v : term) (gvs : list (Prop * term)),
@@ -81,6 +86,26 @@ with union_equal : relation term :=
 where "x =u= y" := (union_equal x y)
 .
 
+Axiom excluded_middle : forall P : Prop, P \/ ~ P.
+
+
+Ltac ueqtauto :=
+  (* repeat progress ( *)
+    try match goal with
+    | [ H: empty_pair _ _ |- _ ] => inversion_clear H
+    | [ H: empty_union (Union _) |- _ ] => inversion_clear H
+    | [ H: Union _ =u= Union _ |- _ ] => inversion_clear H
+    | [ H: Union _ =s= Union _ |- _ ] => inversion_clear H
+    | [ |- Union _ =s= Union _ ] => constructor
+    | [ |- Union _ =u= Union _ ] => constructor
+    | [ |- empty_union (Union []) ] => constructor
+    | [ |- empty_union (Union ((True, _)::_)) ] => apply empty_union_cons_empty
+    | [ |- empty_pair True _ ] => unfold empty_pair; right
+    | _ => fail 1
+    end; intuition (* + intuition*)
+  (* ) *)
+  .
+
 
 (* ----------------------------------Common tests-------------------------------------- *)
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
@@ -88,12 +113,27 @@ Proof. intro x. do 2 constructor. apply empty_union_cons_false_guard. tauto. con
 Qed.
 
 Example truth_erasing_test : forall (x : term), Union [(True, x)] =s= x.
+Proof. admit. Admitted.
 
-Example two_truths_test : forall (x y : term), Union [(True, x)] =s= Union [(True, x), (True, y)] <->
-  empty_union y \/ x =s= y.
+Lemma empty_equal_hence_empty : forall (x y : term), x =s= y -> empty_union x -> empty_union y.
+Proof. admit. Admitted.
 
-Example truths_permut_test : forall (x y : term), Union [(True, x)] =s= Union [(True, x), (True, y)]
-  <-> Union [(True, x)] =s= Union [(True, y), (True, x)].
+Example two_truths_test : forall (x y : term), Union [(True, x)] =s= Union [(True, x); (True, y)] <->
+   empty_union y \/ x =s= y.
+Proof. intros x y. split; intro.
+  - ueqtauto; ueqtauto; ueqtauto; ueqtauto; ueqtauto; ueqtauto.
+  - ueqtauto.
+    + ueqtauto. destruct (excluded_middle (empty_pair True x)).
+      * do 2 right. do 4 ueqtauto. left. do 2 ueqtauto.
+      * do 2 right. do 4 ueqtauto. right. ueqtauto. admit.
+    + ueqtauto. destruct (excluded_middle (empty_pair True x)).
+      * do 2 right. do 4 ueqtauto. eapply empty_equal_hence_empty; eauto. left. do 2 ueqtauto.
+      * left. do 2 ueqtauto. do 2 right. do 3 ueqtauto. right. do 2 ueqtauto. apply H. ueqtauto.
+        eapply empty_equal_hence_empty; eauto. admit. right. ueqtauto. admit.
+Admitted.
+
+Example truths_permut_test : forall (x y : term), Union [(True, x)] =s= Union [(True, x); (True, y)]
+  <-> Union [(True, x)] =s= Union [(True, y); (True, x)].
 
 Example singles_test : forall (g1 g2 : Prop) (v1 v2 : term),
 Union [(g1, v1)] =u= Union [(g2, v2)] <->
@@ -122,7 +162,7 @@ Qed.
 
 
 
-Axiom excluded_middle : forall P : Prop, P \/ ~ P.
+
 
 
 Instance semeq_is_reflexive : Reflexive semantically_equal.
