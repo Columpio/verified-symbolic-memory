@@ -74,13 +74,9 @@ with union_equal : relation term :=
 | uneq_nil_l : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> Union gvs =u= Union []
 | uneq_nil_r : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> Union [] =u= Union gvs
 | uneq_cons : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-      empty_pair g1 v1 /\  empty_pair g2 v2 /\ Union gvs1 =u= Union gvs2
-  \/  empty_pair g1 v1 /\ ~empty_pair g2 v2 /\ Union            gvs1  =u= Union ((g2, v2)::gvs2)
-  \/ ~empty_pair g1 v1 /\  empty_pair g2 v2 /\ Union ((g1, v1)::gvs1) =u= Union            gvs2
-  \/ ~empty_pair g1 v1 /\ ~empty_pair g2 v2 /\ v1 =s= v2 /\
-      (  Union            gvs1  =u= Union            gvs2
-      \/ Union            gvs1  =u= Union ((g2, v2)::gvs2)
-      \/ Union ((g1, v1)::gvs1) =u= Union            gvs2)
+     ~empty_pair g1 v1 /\ Union ((g1, v1)::gvs1) =u= Union gvs2 /\ (empty_pair g2 v2 \/ ~empty_pair g2 v2 /\ v1 =s= v2)
+  \/ ~empty_pair g2 v2 /\ Union gvs1 =u= Union ((g2, v2)::gvs2) /\ (empty_pair g1 v1 \/ ~empty_pair g1 v1 /\ v1 =s= v2)
+  \/ Union gvs1 =u= Union gvs2 /\ (empty_pair g1 v1 /\ empty_pair g2 v2 \/ ~empty_pair g1 v1 /\ ~empty_pair g2 v2 /\ v1 =s= v2)
   -> Union ((g1, v1)::gvs1) =u= Union ((g2, v2)::gvs2)
 where "x =u= y" := (union_equal x y)
 .
