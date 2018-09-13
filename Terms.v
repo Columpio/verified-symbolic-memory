@@ -50,43 +50,97 @@ Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
 
 Reserved Notation "x =s= y" (at level 50).
 Reserved Notation "x =u= y" (at level 50).
-Reserved Notation "x =neu= y" (at level 50).
+Reserved Notation "x =lu= y" (at level 50).
+
+Definition empty_pair g v := ~g \/ empty_union v.
 
 Inductive semantically_equal : relation term :=
 (*| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
 | semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2*)
 (*| semeq_symm : forall (t1 t2 : term), t1 =s= t2 -> t2 =s= t1*)
-| semeq_unionr : forall (t : term) (l : list (Prop * term)), t =u= Union l -> t =s= Union l
-| semeq_unionl : forall (t : term) (l : list (Prop * term)), t =u= Union l -> Union l =s= t
+| semeq_union : forall (gvs1 gvs2 : list (Prop * term)), Union gvs1 =u= Union gvs2 -> Union gvs1 =s= Union gvs2
 | semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
 | semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
+| semeq_th_u : forall (th1 : th) (gvs : list (Prop * term)),
+  Theory th1 =lu= Union gvs -> Theory th1 =s= Union gvs
+| semeq_loc_u : forall (loc1 : loc) (gvs : list (Prop * term)),
+  Location loc1 =lu= Union gvs -> Location loc1 =s= Union gvs
 where "x =s= y" := (semantically_equal x y)
-with union_equal_with_empty : relation term :=
-| uneq_th : forall (theory : th) (gvs : list (Prop * term)),
-  Theory theory =u= Union gvs -> Union gvs =u= Theory theory
-| uneq_loc : forall (location : loc) (gvs : list (Prop * term)),
-  Location location =u= Union gvs -> Union gvs =u= Location location
-| uneq_nil : forall (x : term) (*(gvs : list (Prop * term))*),
-  (*~ disjunct gvs -> *) empty_union x -> x =u= Union []
-| uneq_cons : forall (x v : term) (g : Prop) (gvs : list (Prop * term)),
-  (*(g \/ disjunct gvs) /\*)
-  (~ g /\            x =u= Union gvs \/
-     g /\ x =s= v /\ x =neu= Union gvs) -> x =u= Union ((g, v) :: gvs)
-where "x =u= y" := (union_equal_with_empty x y)
-with union_equal_not_empty : relation term :=
-| uneqnil_nil : forall (x : term), x =neu= Union []
-| uneqnil_cons : forall (x v : term) (g : Prop) (gvs : list (Prop * term)),
-    x =neu= Union gvs /\ (~ g \/ g /\ x =s= v) -> x =neu= Union ((g, v) :: gvs)
-where "x =neu= y" := (union_equal_not_empty x y)
+with union_equal_linear : relation term :=
+| uneql : forall (g : Prop) (x v : term) (gvs : list (Prop * term)),
+  g /\ x =s= v \/ ~g /\ x =lu= Union gvs -> x =lu= Union ((g, v)::gvs)
+where "x =lu= y" := (union_equal_linear x y)
+with union_equal : relation term :=
+| uneq_nil_l : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> Union gvs =u= Union []
+| uneq_nil_r : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> Union [] =u= Union gvs
+| uneq_cons : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
+      empty_pair g1 v1 /\  empty_pair g2 v2 /\ Union gvs1 =u= Union gvs2
+  \/  empty_pair g1 v1 /\ ~empty_pair g2 v2 /\ Union            gvs1  =u= Union ((g2, v2)::gvs2)
+  \/ ~empty_pair g1 v1 /\  empty_pair g2 v2 /\ Union ((g1, v1)::gvs1) =u= Union            gvs2
+  \/ ~empty_pair g1 v1 /\ ~empty_pair g2 v2 /\ v1 =s= v2 /\
+      (  Union            gvs1  =u= Union            gvs2
+      \/ Union            gvs1  =u= Union ((g2, v2)::gvs2)
+      \/ Union ((g1, v1)::gvs1) =u= Union            gvs2)
+  -> Union ((g1, v1)::gvs1) =u= Union ((g2, v2)::gvs2)
+where "x =u= y" := (union_equal x y)
 .
 
 
-
+(* ----------------------------------Common tests-------------------------------------- *)
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
-Proof. intro x. apply semeq_unionl. constructor. apply empty_union_cons_false_guard. tauto. constructor.
+Proof. intro x. do 2 constructor. apply empty_union_cons_false_guard. tauto. constructor.
+Qed.
+
+Example truth_erasing_test : forall (x : term), Union [(True, x)] =s= x.
+
+Example two_truths_test : forall (x y : term), Union [(True, x)] =s= Union [(True, x), (True, y)] <->
+  empty_union y \/ x =s= y.
+
+Example truths_permut_test : forall (x y : term), Union [(True, x)] =s= Union [(True, x), (True, y)]
+  <-> Union [(True, x)] =s= Union [(True, y), (True, x)].
+
+Example singles_test : forall (g1 g2 : Prop) (v1 v2 : term),
+Union [(g1, v1)] =u= Union [(g2, v2)] <->
+~g1 /\ ~g2 \/
+ g1 /\ ~g2 /\ empty_union v1 \/
+~g1 /\  g2 /\ empty_union v2 \/
+ g1 /\  g2 /\ v1 =s= v2.
+Proof. intros. split; intro.
+- inversion_clear H; simpl in *. inversion_clear H0; inversion_clear H; inversion_clear H1.
+  + inversion_clear H; tauto.
+  + right; right. symmetry in H. inversion_clear H.
+    * inversion_clear H1; inversion_clear H.
+      ** left. repeat split; try tauto. inversion_clear H1. inversion_clear H3. assumption.
+      ** right. repeat split; try tauto. destruct H1 as [_ [H _]]. symmetry. assumption.
+    * symmetry in H1. inversion_clear H1. inversion_clear H.
+      ** left. repeat split; try tauto. inversion_clear H1. inversion_clear H3. assumption.
+      ** right. repeat split; try tauto. destruct H1 as [_ [H _]]. symmetry. assumption.
+- constructor. destruct H as [[Hng1 Hng2] | [[Hg1 [Hng2 Hev1]] | [[Hng1 [Hg2 Hev2]] | [Hg1 [Hg2 Heq]]]]].
+  + left; split; try tauto. constructor. apply empty_union_cons_false_guard. tauto. constructor.
+  + left; split; try tauto. constructor. apply empty_union_cons_empty. tauto. assumption. constructor.
+  + right; split; try tauto. split; constructor; try tauto. constructor. left. split; try tauto. constructor. assumption.
+  + right; split; try tauto. split; constructor; try tauto. constructor. right. split; try tauto.
+    split. symmetry. assumption. constructor. tauto.
 Qed.
 
 
+
+
+Axiom excluded_middle : forall P : Prop, P \/ ~ P.
+
+
+Instance semeq_is_reflexive : Reflexive semantically_equal.
+Proof. unfold Reflexive. intro x. destruct x; constructor; auto.
+  induction l as [|(g, v)]; constructor. repeat constructor. destruct (excluded_middle g).
+  - do 3 right. intuition.
+    + (* v =s= v *) admit.
+    + (*l ~u~ gvl*)
+      induction l as [| (g', v')]; constructor. right. inversion_clear IHl. intuition.
+      * left. intuition. admit.
+      * do 2 right. intuition. admit. admit. constructor. tauto.
+    + (*gvl ~u~ l*) admit.
+  - tauto.
+Admitted.
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Lemma u_hence_neu : forall (gvs1 gvs2 : list (Prop * term)),
@@ -175,29 +229,7 @@ Instance semeq_is_transitive : Transitive semantically_equal.
 Proof. unfold Transitive. intros x y z Hxy Hyz. destruct x; destruct y; inversion_clear Hxy; admit. Admitted.
 
 
-Example singles_test : forall (g1 g2 : Prop) (v1 v2 : term),
-Union [(g1, v1)] =u= Union [(g2, v2)] <->
-~g1 /\ ~g2 \/
- g1 /\ ~g2 /\ empty_union v1 \/
-~g1 /\  g2 /\ empty_union v2 \/
- g1 /\  g2 /\ v1 =s= v2.
-Proof. intros. split; intro.
-- inversion_clear H; simpl in *. inversion_clear H0; inversion_clear H; inversion_clear H1.
-  + inversion_clear H; tauto.
-  + right; right. symmetry in H. inversion_clear H.
-    * inversion_clear H1; inversion_clear H.
-      ** left. repeat split; try tauto. inversion_clear H1. inversion_clear H3. assumption.
-      ** right. repeat split; try tauto. destruct H1 as [_ [H _]]. symmetry. assumption.
-    * symmetry in H1. inversion_clear H1. inversion_clear H.
-      ** left. repeat split; try tauto. inversion_clear H1. inversion_clear H3. assumption.
-      ** right. repeat split; try tauto. destruct H1 as [_ [H _]]. symmetry. assumption.
-- constructor. destruct H as [[Hng1 Hng2] | [[Hg1 [Hng2 Hev1]] | [[Hng1 [Hg2 Hev2]] | [Hg1 [Hg2 Heq]]]]].
-  + left; split; try tauto. constructor. apply empty_union_cons_false_guard. tauto. constructor.
-  + left; split; try tauto. constructor. apply empty_union_cons_empty. tauto. assumption. constructor.
-  + right; split; try tauto. split; constructor; try tauto. constructor. left. split; try tauto. constructor. assumption.
-  + right; split; try tauto. split; constructor; try tauto. constructor. right. split; try tauto.
-    split. symmetry. assumption. constructor. tauto.
-Qed.
+
 
 
 (* ----------------------------------Technical lemmas-------------------------------------- *)
