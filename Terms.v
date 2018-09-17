@@ -1,9 +1,16 @@
 Require Export Id.
+Require Import Coq.Program.Wf.
+Import Wf.WfExtensionality.
 Require Import Coq.Relations.Relation_Definitions.
 Require Import Coq.Classes.RelationClasses.
 Require Import Coq.Lists.List.
+Require Import Coq.Program.Wf.
+Require Import FunInd.
+Require Import Recdef.
 (* From QuickChick Require Import QuickChick. *)
 Import List.ListNotations.
+
+Print fix_sub_measure_eq_ext.
 
 Variable op : Type.
 
@@ -48,6 +55,80 @@ Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
 
 Lemma empty_union_not_location : forall (l : loc), ~ empty_union (Location l).
 Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
+
+(*
+Fixpoint mergeSort (ls : list A) : list A :=
+  if leb (length ls) 1
+    then ls
+    else let lss := split ls in
+      merge (mergeSort (fst lss)) (mergeSort (snd lss)).
+
+Definition mergeSort : list A -> list A.
+  refine (Fix lengthOrder_wf (fun _ => list A)
+    (fun (ls : list A)
+      (mergeSort : forall ls' : list A, lengthOrder ls' ls -> list A) =>
+      if le_lt_dec 2 (length ls)
+        then let lss := split ls in
+          merge (mergeSort (fst lss) _) (mergeSort (snd lss) _)
+        else ls)); subst lss; eauto.
+Defined.
+*)
+
+Fixpoint height (t : term) : nat :=
+  match t with
+  | Union gvs => 1 + fold_left Nat.max (map (fun gv => match gv with (g, v) => height v end) gvs) 0
+  | _ => 1
+  end.
+
+Lemma height_nested : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  In (g, v) gvs -> height v < height (Union gvs).
+Proof. intros. simpl. admit. Admitted.
+
+Fixpoint map' {A B} (xs : list A) : forall (f : forall (x:A), In x xs -> B), list B :=
+match xs with
+  | [] => fun _ => []
+  | x :: xs => fun f => f x (or_introl eq_refl) :: map' xs (fun y h => f y (or_intror h))
+end.
+
+Program Fixpoint flatten (t : term) {measure (height t)} : term :=
+  match t with
+  | Union gvs => Union (concat (map' gvs (
+    fun gv _ =>
+      match gv with
+      | (g, v) =>
+        match flatten v with
+        | Union gvs' => map' gvs' (fun gv' _ => match gv' with (g', v') => (g /\ g', v') end)
+        | v' => [(g, v')]
+        end
+      end
+    )))
+  | _ => t
+  end.
+Next Obligation. eapply height_nested; eauto. Defined.
+Print All.
+
+Functional Scheme flatten_ind := Induction for flatten Sort Prop.
+
+Definition pretty_flatten (t : term) : term :=
+  match t with
+  | Union gvs => Union (concat (map (
+    fun gv =>
+      match gv with
+      | (g, v) =>
+        match flatten v with
+        | Union gvs' => map (fun gv' => match gv' with (g', v') => (g /\ g', v') end) gvs'
+        | v' => [(g, v')]
+        end
+      end
+    ) gvs))
+  | _ => t
+  end.
+
+Theorem flatten_eq : forall (t : term), flatten t = pretty_flatten t.
+Proof. intros. destruct t; auto. simpl. Print All. induction l as [|(g, v)]; auto.
+  simpl. unfold flatten. 
+Qed.
+
 
 Reserved Notation "x =s= y" (at level 50).
 Reserved Notation "x =u= y" (at level 50).
