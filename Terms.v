@@ -182,6 +182,21 @@ where "x =u= y" := (union_equal x y)
 Definition semantically_equal (t1 t2 : term) : Prop := flatten t1 =l= flatten t2.
 Notation "x =s= y" := (semantically_equal x y).
 
+Reserved Notation "x =iu= y" (at level 50).
+Inductive ind_union_equal : relation term :=
+| iuneq_nil_l : forall (gvs : list (Prop * term)), all_guards_false (Union gvs) -> Union gvs =iu= Union []
+| iuneq_nil_r : forall (gvs : list (Prop * term)), all_guards_false (Union gvs) -> Union [] =iu= Union gvs
+| iuneq_cons_false_1 : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
+  ~ g1 -> Union gvs1 =iu= Union ((g2, v2)::gvs2) -> Union ((g1, v1)::gvs1) =iu= Union ((g2, v2)::gvs2)
+| iuneq_cons_false_2 : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
+  ~ g2 -> Union ((g1, v1)::gvs1) =iu= Union gvs2 -> Union ((g1, v1)::gvs1) =iu= Union ((g2, v2)::gvs2)
+| iuneq_cons : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
+  g1 -> g2 -> v1 = v2 -> (Union gvs1 =iu= Union gvs2
+                          \/ Union gvs1 =iu= Union ((g2, v2)::gvs2)
+                          \/ Union ((g1, v1)::gvs1) =iu= Union gvs2) -> Union ((g1, v1)::gvs1) =iu= Union ((g2, v2)::gvs2)
+where "x =iu= y" := (ind_union_equal x y).
+
+
 (* ----------------------------------Technical stuff-------------------------------------- *)
 Axiom excluded_middle : forall P : Prop, P \/ ~ P.
 
@@ -218,12 +233,34 @@ Ltac simpl_flatten_pair :=
       simpl
     end.
 
+Theorem iu_eq_u : forall (gvs1 gvs2 : list (Prop * term)),
+  Union gvs1 =u= Union gvs2 <-> Union gvs1 =iu= Union gvs2.
+Proof. intros. split; intro.
+  - admit.
+  - generalize dependent gvs2. generalize dependent gvs1.
+    induction gvs1 as [|(g1, v1)]; intros. constructor; inversion_clear H; assumption.
+    inversion H; subst.
+    + constructor. assumption.
+    + constructor. destruct (excluded_middle g2).
+      * intuition.
+      * left. intuition. apply IHgvs1. inversion_clear H5.
+        ** constructor. inversion_clear H1. assumption.
+        ** 
+    + constructor. destruct (excluded_middle g1).
+      * right; right. left. intuition. inversion_clear H5.
+  - generalize dependent gvs2. generalize dependent gvs1.
+    induction gvs2 as [|(g2, v2)]; intro. constructor. inversion_clear H; assumption.
+    induction gvs1 as [|(g1, v1)]. constructor. inversion_clear H. assumption.
+    inversion_clear H. intuition.
+    + constructor. tauto. apply IHgvs1.
+
 Lemma cons_flatten : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
   flatten (Union ((g, v)::gvs)) = Union (flatten_pair (g, v) ++ concat (map flatten_pair gvs)).
 Proof. intros. ueqtauto. Qed.
 
 Instance ueq_is_reflexive : Reflexive (fun gvs1 gvs2 => Union gvs1 =u= Union gvs2).
-Proof. unfold Reflexive. intro x. admit. Admitted.
+Proof. unfold Reflexive. intro gvs. induction gvs as [|(g, v)]; constructor. constructor.
+  destruct (excluded_middle g); tauto. Qed.
 
 Instance semeq_is_reflexive : Reflexive semantically_equal.
 Proof. unfold Reflexive. intro x. destruct x; do 2 ueqtauto; constructor; auto. apply ueq_is_reflexive. Qed.
