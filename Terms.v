@@ -7,10 +7,9 @@ Require Import Coq.Lists.List.
 Require Import Coq.Program.Wf.
 Require Import FunInd.
 Require Import Recdef.
+Require Import Coq.omega.Omega.
 (* From QuickChick Require Import QuickChick. *)
 Import List.ListNotations.
-
-Print fix_sub_measure_eq_ext.
 
 Variable op : Type.
 
@@ -80,6 +79,9 @@ Fixpoint height (t : term) : nat :=
   | _ => 1
   end.
 
+Lemma height_pos : forall (t : term), height t > 0.
+Proof. admit. Admitted.
+
 Lemma height_nested : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
   In (g, v) gvs -> height v < height (Union gvs).
 Proof. intros. simpl. admit. Admitted.
@@ -89,6 +91,17 @@ match xs with
   | [] => fun _ => []
   | x :: xs => fun f => f x (or_introl eq_refl) :: map' xs (fun y h => f y (or_intror h))
 end.
+
+Definition heightOrder (t1 t2 : term) := height t1 < height t2.
+
+Hint Constructors Acc.
+
+Lemma heightOrder_wf' : forall (len : nat) (t : term), height t <= len -> Acc heightOrder t.
+Proof. intros. unfold heightOrder. induction len. inversion H. remember (height_pos t). omega. admit. Admitted.
+(* Defined. *)
+Theorem heightOrder_wf : well_founded heightOrder.
+red; intro; eapply heightOrder_wf'; eauto.
+Defined.
 
 Program Fixpoint flatten (t : term) {measure (height t)} : term :=
   match t with
@@ -107,65 +120,68 @@ Program Fixpoint flatten (t : term) {measure (height t)} : term :=
 Next Obligation. eapply height_nested; eauto. Defined.
 Print All.
 
-Functional Scheme flatten_ind := Induction for flatten Sort Prop.
+Definition flatten_pair (gv : Prop * term) :=
+  match gv with
+  | (g, v) =>
+    match flatten v with
+    | Union gvs' => map (fun gv' => match gv' with (g', v') => (g /\ g', v') end) gvs'
+    | v' => [(g, v')]
+    end
+  end.
 
 Definition pretty_flatten (t : term) : term :=
   match t with
-  | Union gvs => Union (concat (map (
-    fun gv =>
-      match gv with
-      | (g, v) =>
-        match flatten v with
-        | Union gvs' => map (fun gv' => match gv' with (g', v') => (g /\ g', v') end) gvs'
-        | v' => [(g, v')]
-        end
-      end
-    ) gvs))
+  | Union gvs => Union (concat (map flatten_pair gvs))
   | _ => t
   end.
 
 Theorem flatten_eq : forall (t : term), flatten t = pretty_flatten t.
-Proof. intros. destruct t; auto. simpl. Print All. induction l as [|(g, v)]; auto.
-  simpl. unfold flatten. 
-Qed.
-
+Proof. admit. Admitted.
 
 Reserved Notation "x =s= y" (at level 50).
-Reserved Notation "x =u= y" (at level 50).
 Reserved Notation "x =lu= y" (at level 50).
+Reserved Notation "x =l= y" (at level 50).
+Reserved Notation "x =u= y" (at level 50).
 
-Definition empty_pair g v := ~g \/ empty_union v.
+Inductive all_guards_false : term -> Prop :=
+| all_false_nil : all_guards_false (Union [])
+| all_false_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  ~ g -> all_guards_false (Union gvs) -> all_guards_false (Union ((g, v)::gvs)).
 
-Inductive semantically_equal : relation term :=
-(*| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
-| semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2*)
-(*| semeq_symm : forall (t1 t2 : term), t1 =s= t2 -> t2 =s= t1*)
-| semeq_union : forall (gvs1 gvs2 : list (Prop * term)), Union gvs1 =u= Union gvs2 -> Union gvs1 =s= Union gvs2
-| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
-| semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
-| semeq_th_u_l : forall (th1 : th) (gvs : list (Prop * term)),
-  Theory th1 =lu= Union gvs -> Theory th1 =s= Union gvs
-| semeq_th_u_r : forall (th1 : th) (gvs : list (Prop * term)),
-  Theory th1 =lu= Union gvs -> Union gvs =s= Theory th1
-| semeq_loc_u_l : forall (loc1 : loc) (gvs : list (Prop * term)),
-  Location loc1 =lu= Union gvs -> Location loc1 =s= Union gvs
-| semeq_loc_u_r : forall (loc1 : loc) (gvs : list (Prop * term)),
-  Location loc1 =lu= Union gvs -> Union gvs =s= Location loc1
-where "x =s= y" := (semantically_equal x y)
+Inductive linear_equal : relation term :=
+| lineq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =l= Theory th2
+| lineq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =l= Location loc2
+| lineq_th_u_l : forall (th1 : th) (gvs : list (Prop * term)),
+  Theory th1 =lu= Union gvs -> Theory th1 =l= Union gvs
+| lineq_th_u_r : forall (th1 : th) (gvs : list (Prop * term)),
+  Theory th1 =lu= Union gvs -> Union gvs =l= Theory th1
+| lineq_loc_u_l : forall (loc1 : loc) (gvs : list (Prop * term)),
+  Location loc1 =lu= Union gvs -> Location loc1 =l= Union gvs
+| lineq_loc_u_r : forall (loc1 : loc) (gvs : list (Prop * term)),
+  Location loc1 =lu= Union gvs -> Union gvs =l= Location loc1
+| lineq_union : forall (gvs1 gvs2 : list (Prop * term)), Union gvs1 =u= Union gvs2 -> Union gvs1 =l= Union gvs2
+where "x =l= y" := (linear_equal x y)
 with union_equal_linear : relation term :=
 | uneql : forall (g : Prop) (x v : term) (gvs : list (Prop * term)),
-  g /\ x =s= v \/ ~g /\ x =lu= Union gvs -> x =lu= Union ((g, v)::gvs)
+  g /\ x = v \/ ~g /\ x =lu= Union gvs -> x =lu= Union ((g, v)::gvs)
 where "x =lu= y" := (union_equal_linear x y)
 with union_equal : relation term :=
-| uneq_nil_l : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> Union gvs =u= Union []
-| uneq_nil_r : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> Union [] =u= Union gvs
+| uneq_nil_l : forall (gvs : list (Prop * term)), all_guards_false (Union gvs) -> Union gvs =u= Union []
+| uneq_nil_r : forall (gvs : list (Prop * term)), all_guards_false (Union gvs) -> Union [] =u= Union gvs
 | uneq_cons : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-     ~empty_pair g1 v1 /\ Union ((g1, v1)::gvs1) =u= Union gvs2 /\ (empty_pair g2 v2 \/ ~empty_pair g2 v2 /\ v1 =s= v2)
-  \/ ~empty_pair g2 v2 /\ Union gvs1 =u= Union ((g2, v2)::gvs2) /\ (empty_pair g1 v1 \/ ~empty_pair g1 v1 /\ v1 =s= v2)
-  \/ Union gvs1 =u= Union gvs2 /\ (empty_pair g1 v1 /\ empty_pair g2 v2 \/ ~empty_pair g1 v1 /\ ~empty_pair g2 v2 /\ v1 =s= v2)
+  ~ g1 /\ ~ g2 /\ Union gvs1 =u= Union gvs2
+  \/ ~ g1 /\ g2 /\ Union gvs1 =u= Union ((g2, v2)::gvs2)
+  \/   g1 /\ ~ g2 /\ Union ((g1, v1)::gvs1) =u= Union gvs2
+  \/ g1 /\ g2 /\ v1 = v2 /\ (Union gvs1 =u= Union gvs2
+                             \/ Union gvs1 =u= Union ((g2, v2)::gvs2)
+                             \/ Union ((g1, v1)::gvs1) =u= Union gvs2)
   -> Union ((g1, v1)::gvs1) =u= Union ((g2, v2)::gvs2)
 where "x =u= y" := (union_equal x y)
 .
+
+Definition semantically_equal (t1 t2 : term) : Prop := flatten t1 =l= flatten t2.
+Notation "x =s= y" := (semantically_equal x y).
+
 
 Axiom excluded_middle : forall P : Prop, P \/ ~ P.
 
@@ -173,15 +189,18 @@ Axiom excluded_middle : forall P : Prop, P \/ ~ P.
 Ltac ueqtauto :=
   (* repeat progress ( *)
     try match goal with
-    | [ H: empty_pair _ _ |- _ ] => inversion_clear H
+    (* | [ H: empty_pair _ _ |- _ ] => inversion_clear H *)
     | [ H: empty_union (Union _) |- _ ] => inversion_clear H
     | [ H: Union _ =u= Union _ |- _ ] => inversion_clear H
     | [ H: Union _ =s= Union _ |- _ ] => inversion_clear H
-    | [ |- Union _ =s= Union _ ] => constructor
+    | [ H: context [flatten _] |- _ ] => rewrite flatten_eq in H; unfold pretty_flatten in H
+    | [ |- _ =s= _ ] => unfold semantically_equal
     | [ |- Union _ =u= Union _ ] => constructor
+    | [ |- Union _ =l= Union _ ] => constructor
     | [ |- empty_union (Union []) ] => constructor
     | [ |- empty_union (Union ((True, _)::_)) ] => apply empty_union_cons_empty
-    | [ |- empty_pair True _ ] => unfold empty_pair; right
+    | [ |- context [flatten _] ] => rewrite flatten_eq; unfold pretty_flatten
+    (* | [ |- empty_pair True _ ] => unfold empty_pair; right *)
     | _ => fail 1
     end; intuition (* + intuition*)
   (* ) *)
@@ -189,12 +208,51 @@ Ltac ueqtauto :=
 
 
 (* ----------------------------------Common tests-------------------------------------- *)
+Lemma cons_flatten : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  flatten (Union ((g, v)::gvs)) = Union (flatten_pair (g, v) ++ concat (map flatten_pair gvs)).
+Proof. intros. ueqtauto. Qed.
+
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
-Proof. intro x. do 2 constructor. apply empty_union_cons_false_guard. tauto. constructor.
+Proof. intro x. do 3 ueqtauto. simpl. do 2 ueqtauto. rewrite app_nil_r.
+  destruct (flatten x); try constructor; try tauto; try constructor. induction l as [|(g, v)]. constructor.
+  constructor. tauto. auto.
 Qed.
 
+Instance semeq_is_reflexive : Reflexive semantically_equal.
+Proof. unfold Reflexive. intro x. ueqtauto.
+  admit. Admitted.
+
+Lemma ueqflat_is_symmetric : forall (gvs1 gvs2 : list (Prop * term)),
+  flatten (Union gvs1) =u= flatten (Union gvs2) -> flatten (Union gvs2) =u= flatten (Union gvs1).
+Proof.
+  intros. generalize dependent gvs1. induction gvs2 as [|(g2, v2)].
+  - admit.
+  - induction gvs1 as [|(g1, v1)].
+    + admit.
+    + intros. repeat rewrite cons_flatten in *.
+  admit. Admitted.
+
+Instance semeq_is_symmetric : Symmetric semantically_equal.
+Proof. unfold Symmetric. intros x y Hxy. unfold semantically_equal in *.
+  destruct x; destruct y; do 2 ueqtauto.
+  - inversion_clear Hxy; subst. apply semeq_is_reflexive.
+  - inversion Hxy.
+  - admit.
+  - inversion Hxy.
+  - inversion_clear Hxy; subst. apply semeq_is_reflexive.
+  - admit.
+  - admit.
+  - admit.
+  - do 2 ueqtauto. constructor. inversion_clear Hxy. fold flatten. apply ueqflat_is_symmetric.
+
+    admit. Admitted.
+  
+
 Example truth_erasing_test : forall (x : term), Union [(True, x)] =s= x.
-Proof. admit. Admitted.
+Proof. intro x. ueqtauto. ueqtauto. simpl. rewrite app_nil_r.
+  destruct (flatten x); try constructor; try constructor; try tauto. induction l as [|(g, v)]. simpl. do 2 constructor.
+  simpl. constructor. intuition. destruct (excluded_middle g); tauto.
+Qed.
 
 Lemma empty_equal_hence_empty : forall (x y : term), x =s= y -> empty_union x -> empty_union y.
 Proof. admit. Admitted.
@@ -246,8 +304,7 @@ Qed.
 
 
 
-Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. destruct x; constructor; auto.
+ intro x. destruct x; constructor; auto.
   induction l as [|(g, v)]; constructor. repeat constructor. destruct (excluded_middle g).
   - do 3 right. intuition.
     + (* v =s= v *) admit.
