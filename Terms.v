@@ -163,16 +163,16 @@ Inductive linear_equal : relation term :=
 where "x =l= y" := (linear_equal x y)
 with union_equal_linear : relation term :=
 | uneql : forall (g : Prop) (x v : term) (gvs : list (Prop * term)),
-  g /\ x = v \/ ~g /\ x =lu= Union gvs -> x =lu= Union ((g, v)::gvs)
+  g /\ (x = v \/ x =lu= Union gvs) \/ ~g /\ x =lu= Union gvs -> x =lu= Union ((g, v)::gvs)
 where "x =lu= y" := (union_equal_linear x y)
 with union_equal : relation term :=
 | uneq_nil_l : forall (gvs : list (Prop * term)), all_guards_false (Union gvs) -> Union gvs =u= Union []
 | uneq_nil_r : forall (gvs : list (Prop * term)), all_guards_false (Union gvs) -> Union [] =u= Union gvs
 | uneq_cons : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  ~ g1 /\ ~ g2 /\ Union gvs1 =u= Union gvs2
-  \/ ~ g1 /\ g2 /\ Union gvs1 =u= Union ((g2, v2)::gvs2)
+     ~ g1 /\ ~ g2 /\ Union gvs1 =u= Union gvs2
+  \/ ~ g1 /\   g2 /\ Union gvs1 =u= Union ((g2, v2)::gvs2)
   \/   g1 /\ ~ g2 /\ Union ((g1, v1)::gvs1) =u= Union gvs2
-  \/ g1 /\ g2 /\ v1 = v2 /\ (Union gvs1 =u= Union gvs2
+  \/   g1 /\   g2 /\ v1 = v2 /\ (Union gvs1 =u= Union gvs2
                              \/ Union gvs1 =u= Union ((g2, v2)::gvs2)
                              \/ Union ((g1, v1)::gvs1) =u= Union gvs2)
   -> Union ((g1, v1)::gvs1) =u= Union ((g2, v2)::gvs2)
@@ -182,9 +182,8 @@ where "x =u= y" := (union_equal x y)
 Definition semantically_equal (t1 t2 : term) : Prop := flatten t1 =l= flatten t2.
 Notation "x =s= y" := (semantically_equal x y).
 
-
+(* ----------------------------------Technical stuff-------------------------------------- *)
 Axiom excluded_middle : forall P : Prop, P \/ ~ P.
-
 
 Ltac ueqtauto :=
   (* repeat progress ( *)
@@ -206,21 +205,60 @@ Ltac ueqtauto :=
   (* ) *)
   .
 
+Ltac simpl_flatten_pair :=
+    match goal with
+    | [ |- context [flatten_pair (_, ?v)] ] =>
+      simpl; destruct (flatten v); try (constructor; auto; constructor);
+      try match goal with
+      | [ |- context [Union (map _ ?l)] ] =>
+        let g' := fresh "g" in
+        let v' := fresh "v" in
+        induction l as [|(g', v')]; simpl
+      end;
+      simpl
+    end.
 
-(* ----------------------------------Common tests-------------------------------------- *)
 Lemma cons_flatten : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
   flatten (Union ((g, v)::gvs)) = Union (flatten_pair (g, v) ++ concat (map flatten_pair gvs)).
 Proof. intros. ueqtauto. Qed.
 
-Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
-Proof. intro x. do 3 ueqtauto. simpl. do 2 ueqtauto. rewrite app_nil_r.
-  destruct (flatten x); try constructor; try tauto; try constructor. induction l as [|(g, v)]. constructor.
-  constructor. tauto. auto.
-Qed.
+Instance ueq_is_reflexive : Reflexive (fun gvs1 gvs2 => Union gvs1 =u= Union gvs2).
+Proof. unfold Reflexive. intro x. admit. Admitted.
 
 Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. ueqtauto.
-  admit. Admitted.
+Proof. unfold Reflexive. intro x. destruct x; do 2 ueqtauto; constructor; auto. apply ueq_is_reflexive. Qed.
+
+Lemma strange_lemm : 
+
+Lemma eql_app_r : forall (gvs gvs1 gvs2 : list (Prop * term)), Union gvs1 =u= Union gvs2 ->
+  Union (gvs1 ++ gvs) =u= Union (gvs2 ++ gvs).
+Proof. intros. induction gvs2.
+  - simpl. inversion_clear H.
+    + induction gvs1 as [|(g1, v1)]. simpl. apply ueq_is_reflexive. inversion_clear H0.
+    + simpl. apply ueq_is_reflexive.
+admit. Admitted.
+
+Lemma false_flatten_pair_app : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  ~ g -> Union (flatten_pair (g, v) ++ gvs) =u= Union gvs.
+Proof. (* TODO: useless*)
+  (*intros. generalize dependent v. generalize dependent g. induction gvs as [|(g', v')]; intros.
+  - constructor. rewrite app_nil_r. simpl_flatten_pair.
+    constructor. constructor. tauto. auto.
+  - destruct (excluded_middle g'); simpl; destruct (flatten v).
+      * constructor; right; left; intuition; apply ueq_is_reflexive.
+      * constructor; right; left; intuition; apply ueq_is_reflexive.
+      * induction l as [|(g'', v'')]; simpl. apply ueq_is_reflexive. constructor. tauto.
+      * simpl. constructor. left; intuition. admit.
+      * admit.
+      * admit.*)
+admit. Admitted.
+
+Theorem false_erasing : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  ~ g -> Union ((g, v)::gvs) =s= Union gvs.
+Proof. intros. ueqtauto. rewrite cons_flatten. ueqtauto. constructor.
+  replace (Union (concat (map flatten_pair gvs))) with (Union ([] ++ concat (map flatten_pair gvs))); auto.
+  apply eql_app_r. constructor. simpl_flatten_pair; constructor. tauto. auto.
+Qed.
 
 Lemma ueqflat_is_symmetric : forall (gvs1 gvs2 : list (Prop * term)),
   flatten (Union gvs1) =u= flatten (Union gvs2) -> flatten (Union gvs2) =u= flatten (Union gvs1).
