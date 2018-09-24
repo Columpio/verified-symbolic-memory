@@ -166,24 +166,23 @@ Ltac ueqtauto :=
   (* ) *)
   .
 
-
+Check term_ind'.
 (* ----------------------------------Common tests-------------------------------------- *)
 Lemma empty_union_dichotomy : forall (t : term), empty_union t \/ ~ empty_union t.
 Proof. intros. induction t using term_ind'; try now right. auto.
   intuition; destruct (excluded_middle g); auto; right; intro Hfalse; inversion_clear Hfalse; tauto.
 Qed.
 
-Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. induction x using term_ind'; auto. do 3 ueqtauto.
-  do 2 right. intuition. enough (Hit: empty_pair g x \/ (empty_pair g x -> False) /\ x =s= x). tauto.
-    unfold empty_pair. destruct (excluded_middle g); destruct (empty_union_dichotomy x); tauto.
-Qed.
-Hint Resolve semeq_is_reflexive.
-
 Lemma ss_u_u : forall (gvs1 gvs2 : list (Prop * term)), (Union gvs1 =s= Union gvs2 -> Union gvs2 =s= Union gvs1) ->
   Union gvs1 =u= Union gvs2 -> Union gvs2 =u= Union gvs1.
 Proof. intros. enough (Hit: Union gvs2 =s= Union gvs1). ueqtauto. auto. Qed.
 Hint Resolve ss_u_u.
+
+Instance semeq_is_reflexive : Reflexive semantically_equal.
+Proof. unfold Reflexive. intro x. induction x using term_ind'; auto. do 3 ueqtauto.
+  do 2 right. intuition. unfold empty_pair. destruct (excluded_middle g); destruct (empty_union_dichotomy x); tauto.
+Qed.
+Hint Resolve semeq_is_reflexive.
 
 Instance union_equal_empty_is_symmetric : Symmetric semantically_equal.
 Proof. unfold Symmetric. intros x y Hxy. generalize dependent y. induction x using term_ind'; intros y Hxy.
