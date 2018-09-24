@@ -31,10 +31,12 @@ where "x =t= y" := (theory_equal x y).*)
 
 (*Definition GuardedValues := list (Prop * term)*)               
 
+Unset Elimination Schemes.
 Inductive term : Type :=
 | Theory : th -> term
 | Location : loc -> term
 | Union : list (Prop * term) -> term.
+Set Elimination Schemes.
 
 Section correct_term_ind.
 Variables (P : term -> Prop) (Q : list (Prop * term) -> Prop).
@@ -74,30 +76,6 @@ Inductive empty_union : term -> Prop :=
     ~ g -> empty_union (Union ts) -> empty_union (Union ((g, t) :: ts))
 .
 
-Lemma empty_union_not_theory : forall (t : th), ~ empty_union (Theory t).
-Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
-
-Lemma empty_union_not_location : forall (l : loc), ~ empty_union (Location l).
-Proof. unfold not. intros. inversion H; induction ts; inversion H0. Qed.
-
-(*
-Fixpoint mergeSort (ls : list A) : list A :=
-  if leb (length ls) 1
-    then ls
-    else let lss := split ls in
-      merge (mergeSort (fst lss)) (mergeSort (snd lss)).
-
-Definition mergeSort : list A -> list A.
-  refine (Fix lengthOrder_wf (fun _ => list A)
-    (fun (ls : list A)
-      (mergeSort : forall ls' : list A, lengthOrder ls' ls -> list A) =>
-      if le_lt_dec 2 (length ls)
-        then let lss := split ls in
-          merge (mergeSort (fst lss) _) (mergeSort (snd lss) _)
-        else ls)); subst lss; eauto.
-Defined.
-*)
-
 Fixpoint height (t : term) : nat :=
   match t with
   | Union gvs => 1 + fold_left Nat.max (map (fun gv => match gv with (g, v) => height v end) gvs) 0
@@ -113,45 +91,6 @@ match xs with
   | [] => fun _ => []
   | x :: xs => fun f => f x (or_introl eq_refl) :: map' xs (fun y h => f y (or_intror h))
 end.
-
-Program Fixpoint flatten (t : term) {measure (height t)} : term :=
-  match t with
-  | Union gvs => Union (concat (map' gvs (
-    fun gv _ =>
-      match gv with
-      | (g, v) =>
-        match flatten v with
-        | Union gvs' => map' gvs' (fun gv' _ => match gv' with (g', v') => (g /\ g', v') end)
-        | v' => [(g, v')]
-        end
-      end
-    )))
-  | _ => t
-  end.
-Next Obligation. eapply height_nested; eauto. Defined.
-Print All.
-
-Functional Scheme flatten_ind := Induction for flatten Sort Prop.
-
-Definition pretty_flatten (t : term) : term :=
-  match t with
-  | Union gvs => Union (concat (map (
-    fun gv =>
-      match gv with
-      | (g, v) =>
-        match flatten v with
-        | Union gvs' => map (fun gv' => match gv' with (g', v') => (g /\ g', v') end) gvs'
-        | v' => [(g, v')]
-        end
-      end
-    ) gvs))
-  | _ => t
-  end.
-
-Theorem flatten_eq : forall (t : term), flatten t = pretty_flatten t.
-Proof. intros. destruct t; auto. simpl. Print All. induction l as [|(g, v)]; auto.
-  simpl. unfold flatten. 
-Qed.
 
 
 Reserved Notation "x =s= y" (at level 50).
@@ -213,12 +152,35 @@ Ltac ueqtauto :=
 
 
 (* ----------------------------------Common tests-------------------------------------- *)
+Lemma empty_union_dichotomy : forall (t : term), empty_union t \/ ~ empty_union t.
+Proof. intros. induction t using term_ind' with (Q := fun gvs => empty_union (Union gvs) \/ ~ empty_union (Union gvs)); try now right.
+  - assumption.
+  - left. constructor.
+  - intuition.
+    + left. destruct (excluded_middle g). 
+      * constructor; tauto.
+      * apply empty_union_cons_false_guard; tauto.
+    + right. intro Hfalse. inversion_clear Hfalse; tauto.
+    + destruct (excluded_middle g).
+      * right. intro Hfalse. inversion_clear Hfalse; tauto.
+      * left. apply empty_union_cons_false_guard; tauto.
+    + right. intro Hfalse. inversion_clear Hfalse; tauto.
+Qed.
+
+Instance semeq_is_reflexive : Reflexive semantically_equal.
+Proof. unfold Reflexive. intro x. induction x using term_ind' with (Q := fun gvs => Union gvs =u= Union gvs); constructor; auto.
+  - constructor.
+  - do 2 right. intuition. enough (Hit: empty_pair g x \/ (empty_pair g x -> False) /\ x =s= x). tauto.
+    unfold empty_pair. destruct (excluded_middle g); destruct (empty_union_dichotomy x); tauto.
+Qed.
+
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
 Proof. intro x. do 2 constructor. apply empty_union_cons_false_guard. tauto. constructor.
 Qed.
 
 Example truth_erasing_test : forall (x : term), Union [(True, x)] =s= x.
-Proof. admit. Admitted.
+Proof. intro x. 
+admit. Admitted.
 
 Lemma empty_equal_hence_empty : forall (x y : term), x =s= y -> empty_union x -> empty_union y.
 Proof. admit. Admitted.
@@ -270,18 +232,7 @@ Qed.
 
 
 
-Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. destruct x; constructor; auto.
-  induction l as [|(g, v)]; constructor. repeat constructor. destruct (excluded_middle g).
-  - left. intuition.
-    + (* v =s= v *) admit.
-    + (*l ~u~ gvl*)
-      induction l as [| (g', v')]; constructor. right. inversion_clear IHl. intuition.
-      * left. intuition. admit.
-      * do 2 right. intuition. admit. admit. constructor. tauto.
-    + (*gvl ~u~ l*) admit.
-  - tauto.
-Admitted.
+
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Lemma u_hence_neu : forall (gvs1 gvs2 : list (Prop * term)),
