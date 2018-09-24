@@ -35,6 +35,33 @@ Inductive term : Type :=
 | Location : loc -> term
 | Union : list (Prop * term) -> term.
 
+Check term_ind.
+
+Section correct_term_ind.
+Definition AllGuards : list (Prop * term) -> Prop := Forall fst.
+
+Variables (P : term -> Prop).
+
+Hypotheses
+ (* (H_t : forall (t : th), P (Theory t)) *)
+(*  (H_l : forall (lc : loc), P (Location lc)) *)
+ (H : forall (gvs : list (Prop * term)), Forall P (map snd gvs) -> P (Union gvs))
+ (H_cons : forall (g : Prop) (v : term), P v -> forall gvs : list (Prop * term),
+  Forall P gvs -> Forall P ((g, v)::gvs)).
+
+
+Fixpoint ltree_ind2 (t:ltree A) : P t :=
+  match t as x return P x with
+  | lnode a l =>
+      H a l
+        (((fix l_ind (l':list term) : Q l' :=
+             match l' as x return Q x with
+             | nil => H0
+             | cons t1 tl => H1 t1 (ltree_ind2 t1) tl (l_ind tl)
+             end)) l)
+  end.
+End correct_term_ind.
+
 Fixpoint disjunct (gvs : list (Prop * term)) : Prop :=
   match gvs with
   | [] => False
