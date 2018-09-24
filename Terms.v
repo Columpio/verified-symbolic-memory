@@ -36,6 +36,30 @@ Inductive term : Type :=
 | Location : loc -> term
 | Union : list (Prop * term) -> term.
 
+Section correct_term_ind.
+Variables (P : term -> Prop) (Q : list (Prop * term) -> Prop).
+
+Hypotheses
+  (Hth : forall (x : th), P (Theory x))
+  (Hloc : forall (x : loc), P (Location x))
+  (Hall : forall (gvs : list (Prop * term)), Q gvs -> P (Union gvs))
+  (Hu_nil : Q [])
+  (Hu_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)), P v -> Q gvs -> Q ((g, v)::gvs)).
+
+Fixpoint term_ind' (t : term) : P t :=
+  match t as x return P x with
+  | Theory x => Hth x
+  | Location x => Hloc x
+  | Union gvs =>
+    Hall gvs
+      ((fix u_ind (gvs' : list (Prop * term)) : Q gvs' :=
+        match gvs' as x return Q x with
+        | [] => Hu_nil
+        | (g, v)::gvs'' => Hu_cons g v gvs'' (term_ind' v) (u_ind gvs'')
+        end) gvs)
+  end.
+End correct_term_ind.
+
 Fixpoint disjunct (gvs : list (Prop * term)) : Prop :=
   match gvs with
   | [] => False
@@ -249,7 +273,7 @@ Qed.
 Instance semeq_is_reflexive : Reflexive semantically_equal.
 Proof. unfold Reflexive. intro x. destruct x; constructor; auto.
   induction l as [|(g, v)]; constructor. repeat constructor. destruct (excluded_middle g).
-  - do 3 right. intuition.
+  - left. intuition.
     + (* v =s= v *) admit.
     + (*l ~u~ gvl*)
       induction l as [| (g', v')]; constructor. right. inversion_clear IHl. intuition.
