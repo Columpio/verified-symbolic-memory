@@ -96,6 +96,7 @@ Reserved Notation "x =u= y" (at level 50).
 Reserved Notation "x =lu= y" (at level 50).
 
 Definition empty_pair g v := ~g \/ empty_union v.
+Hint Unfold empty_pair.
 
 Inductive semantically_equal : relation term :=
 (*| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
@@ -128,6 +129,8 @@ with union_equal : relation term :=
 where "x =u= y" := (union_equal x y).
 Hint Extern 1 (Theory _ =s= Theory _) => constructor.
 Hint Extern 1 (Location _ =s= Location _) => constructor.
+Hint Extern 1 (Union _ =s= Theory _) => constructor.
+Hint Extern 1 (Union _ =s= Location _) => constructor.
 Hint Extern 1 (Union _ =s= Union _) => constructor.
 Hint Extern 1 (Union _ =u= Union _) => constructor.
 
@@ -138,14 +141,26 @@ Ltac ueqtauto :=
   (* repeat progress ( *)
     try match goal with
     | [ H: empty_pair _ _ |- _ ] => inversion_clear H
-    | [ H: empty_union (Union _) |- _ ] => inversion_clear H
-    | [ H: Union _ =u= Union _ |- _ ] => inversion_clear H
+    (* | [ H: empty_union (Union _) |- _ ] => inversion_clear H *)
+    (* | [ H: Union _ =u= Union _ |- _ ] => inversion_clear H *)
+    | [ H: Theory _ =s= Theory _ |- _ ] => inversion_clear H
+    | [ H: Union _ =s= Location _ |- _ ] => inversion_clear H
     | [ H: Union _ =s= Union _ |- _ ] => inversion_clear H
+    | [ H: Union _ =s= Theory _ |- _ ] => inversion_clear H
+    | [ H: Union _ =s= Location _ |- _ ] => inversion_clear H
+    | [ H: Theory _ =lu= Union (_::_) |- _ ] => inversion_clear H
+    | [ H: Location _ =lu= Union (_::_) |- _ ] => inversion_clear H
+    | [ H: Union (_::_) =u= Union (_::_) |- _ ] => inversion_clear H
+    | [ H: Union _ =u= Union [] |- _ ] => inversion_clear H
+    | [ |- Theory _ =s= Union _ ] => constructor
+    | [ |- Theory _ =lu= Union (_::_) ] => constructor
+    | [ |- Location _ =s= Union _ ] => constructor
+    | [ |- Location _ =lu= Union (_::_) ] => constructor
     | [ |- Union _ =s= Union _ ] => constructor
-    | [ |- Union _ =u= Union _ ] => constructor
-    | [ |- empty_union (Union []) ] => constructor
-    | [ |- empty_union (Union ((True, _)::_)) ] => apply empty_union_cons_empty
-    | [ |- empty_pair True _ ] => unfold empty_pair; right
+    | [ |- Union (_::_) =u= Union (_::_) ] => constructor
+    (* | [ |- empty_union (Union []) ] => constructor *)
+    (* | [ |- empty_union (Union ((True, _)::_)) ] => apply empty_union_cons_empty *)
+    (* | [ |- empty_pair True _ ] => unfold empty_pair; right *)
     | _ => fail 1
     end; intuition (* + intuition*)
   (* ) *)
@@ -159,21 +174,26 @@ Proof. intros. induction t using term_ind'; try now right. auto.
 Qed.
 
 Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. induction x using term_ind'; auto. do 2 constructor.
-  do 2 right. inversion_clear IHx0. intuition. enough (Hit: empty_pair g x \/ (empty_pair g x -> False) /\ x =s= x). tauto.
+Proof. unfold Reflexive. intro x. induction x using term_ind'; auto. do 3 ueqtauto.
+  do 2 right. intuition. enough (Hit: empty_pair g x \/ (empty_pair g x -> False) /\ x =s= x). tauto.
     unfold empty_pair. destruct (excluded_middle g); destruct (empty_union_dichotomy x); tauto.
 Qed.
 Hint Resolve semeq_is_reflexive.
 
+Lemma ss_u_u : forall (gvs1 gvs2 : list (Prop * term)), (Union gvs1 =s= Union gvs2 -> Union gvs2 =s= Union gvs1) ->
+  Union gvs1 =u= Union gvs2 -> Union gvs2 =u= Union gvs1.
+Proof. intros. enough (Hit: Union gvs2 =s= Union gvs1). ueqtauto. auto. Qed.
+Hint Resolve ss_u_u.
+
 Instance union_equal_empty_is_symmetric : Symmetric semantically_equal.
-Proof. unfold Symmetric. intros x y Hxy. induction x using term_ind'.
-  - destruct y; inversion_clear Hxy; subst; auto. constructor. assumption.
-  - destruct y; inversion_clear Hxy; subst; auto. constructor. assumption.
-  - destruct y; inversion_clear Hxy; constructor; auto. constructor. inversion_clear H; auto.
-  - induction y using term_ind'. admit. admit. do 2 constructor. inversion_clear Hxy. inversion_clear H. assumption.
-    do 2 constructor. inversion_clear Hxy. inversion_clear H. intuition.
-    + right; left; intuition. enough (Hit: Union gvs0 =s= Union ((g, x) :: gvs)). inversion Hit; auto.
-      apply IHy0. constructor. assumption. intro.
+Proof. unfold Symmetric. intros x y Hxy. generalize dependent y. induction x using term_ind'; intros y Hxy.
+  - destruct y; inversion_clear Hxy; auto.
+  - destruct y; inversion_clear Hxy; auto.
+  - destruct y; inversion_clear Hxy; inversion_clear H; auto.
+  - destruct y. do 4 ueqtauto. do 4 ueqtauto. induction l as [|(g', v')].
+    + do 2 ueqtauto.
+    + do 2 constructor. do 2 ueqtauto.
+Qed.
 
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
 Proof. intro x. do 2 constructor. apply empty_union_cons_false_guard. tauto. constructor.
