@@ -9,6 +9,7 @@ Require Import FunInd.
 Require Import Recdef.
 (* From QuickChick Require Import QuickChick. *)
 Import List.ListNotations.
+Unset Intuition Negation Unfolding.
 
 Variable op : Type.
 
@@ -46,7 +47,7 @@ Hypotheses
   (Hu_nil : P (Union []))
   (Hu_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)), P v -> P (Union gvs) -> P (Union ((g, v)::gvs))).
 
-Fixpoint term_ind' (t : term) : P t :=
+Fixpoint term_ind (t : term) : P t :=
   match t as x return P x with
   | Theory x => Hth x
   | Location x => Hloc x
@@ -55,7 +56,7 @@ Fixpoint term_ind' (t : term) : P t :=
       ((fix u_ind (gvs' : list (Prop * term)) : P (Union gvs') :=
         match gvs' as x return P (Union x) with
         | [] => Hu_nil
-        | (g, v)::gvs'' => Hu_cons g v gvs'' (term_ind' v) (u_ind gvs'')
+        | (g, v)::gvs'' => Hu_cons g v gvs'' (term_ind v) (u_ind gvs'')
         end) gvs)
   end.
 End correct_term_ind.
@@ -76,7 +77,7 @@ Hint Constructors empty_union.
 
 Fixpoint height (t : term) : nat :=
   match t with
-  | Union gvs => 1 + fold_left Nat.max (map (fun gv => match gv with (g, v) => height v end) gvs) 0
+  | Union gvs => 1 + fold_left Nat.max (map (fun '(g, v) => height v) gvs) 0
   | _ => 1
   end.
 
@@ -166,12 +167,14 @@ Ltac ueqtauto :=
   (* ) *)
   .
 
-Check term_ind'.
 (* ----------------------------------Common tests-------------------------------------- *)
 Lemma empty_union_dichotomy : forall (t : term), empty_union t \/ ~ empty_union t.
-Proof. intros. induction t using term_ind'; try now right. auto.
+Proof. intros. induction t using term_ind; try now right. auto.
   intuition; destruct (excluded_middle g); auto; right; intro Hfalse; inversion_clear Hfalse; tauto.
 Qed.
+
+Lemma empty_pair_dichotomy : forall (g : Prop) (v : term), empty_pair g v \/ ~ empty_pair g v.
+Proof. intros. unfold empty_pair. destruct (excluded_middle g); destruct (empty_union_dichotomy v); tauto. Qed.
 
 Lemma ss_u_u : forall (gvs1 gvs2 : list (Prop * term)), (Union gvs1 =s= Union gvs2 -> Union gvs2 =s= Union gvs1) ->
   Union gvs1 =u= Union gvs2 -> Union gvs2 =u= Union gvs1.
@@ -179,13 +182,13 @@ Proof. intros. enough (Hit: Union gvs2 =s= Union gvs1). ueqtauto. auto. Qed.
 Hint Resolve ss_u_u.
 
 Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. induction x using term_ind'; auto. do 3 ueqtauto.
+Proof. unfold Reflexive. intro x. induction x using term_ind; auto. do 3 ueqtauto.
   do 2 right. intuition. unfold empty_pair. destruct (excluded_middle g); destruct (empty_union_dichotomy x); tauto.
 Qed.
 Hint Resolve semeq_is_reflexive.
 
-Instance union_equal_empty_is_symmetric : Symmetric semantically_equal.
-Proof. unfold Symmetric. intros x y Hxy. generalize dependent y. induction x using term_ind'; intros y Hxy.
+Instance semeq_is_symmetric : Symmetric semantically_equal.
+Proof. unfold Symmetric. intros x. induction x using term_ind; intros y Hxy.
   - destruct y; inversion_clear Hxy; auto.
   - destruct y; inversion_clear Hxy; auto.
   - destruct y; inversion_clear Hxy; inversion_clear H; auto.
@@ -194,12 +197,34 @@ Proof. unfold Symmetric. intros x y Hxy. generalize dependent y. induction x usi
     + do 2 constructor. do 2 ueqtauto.
 Qed.
 
+Lemma erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
+  Union gvsx =u= Union gvsy -> empty_pair gy vy -> Union gvsx =u= Union ((gy, vy)::gvsy).
+Proof. admit. Admitted. (*intros gy vy gvsx gvsy Hueq Hemp. induction gvsx as [|(gx, vx)]. admit.
+  constructor. destruct (empty_pair_dichotomy gx vx).
+  - do 2 right. intuition.*)
+
+Instance semeq_is_transitive : Transitive semantically_equal.
+Proof. unfold Transitive. intros x y z Hxy Hyz. generalize dependent x.
+  induction y as [t | HHH | HHH | gy vy gvsy Hhead Htail] using term_ind; intros x Hxy.
+  - admit.
+  - admit.
+  - admit.
+  - destruct x.
+    + admit.
+    + admit.
+    + induction l as [|(gx, vx) gvsx]. admit. inversion_clear Hxy. inversion_clear H. intuition.
+      apply Htail; auto. admit.
+      destruct z.
+      * admit.
+      * admit.
+      * 
+
 Example empty_test : forall (x : term), Union [] =s= Union [(False, x)].
 Proof. intro x. do 2 constructor. apply empty_union_cons_false_guard. tauto. constructor.
 Qed.
 
 Example truth_erasing_test : forall (x : term), Union [(True, x)] =s= x.
-Proof. intro x. induction x using term_ind'; do 2 constructor; intuition.
+Proof. intro x. induction x using term_ind; do 2 constructor; intuition.
   - repeat constructor.
   - admit.
 Admitted.
@@ -377,7 +402,7 @@ Lemma union_false_erasing : forall (t : term) (gvs : list (Prop * term)), Union 
 Proof. intros t gvs. apply semeq_unionl. apply uneq_cons. left. intros _. reflexivity. Qed.
 
 Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
-  Union ((g, Union xgvs) :: ygvs) =s= Union (map (fun x => match x with (g', v) => (g /\ g', v) end) xgvs ++ ygvs).
+  Union ((g, Union xgvs) :: ygvs) =s= Union (map (fun '(g', v) => (g /\ g', v)) xgvs ++ ygvs).
 Proof. intros g xgvs ygvs. admit. Admitted.
 
 Lemma union_same_value_lr : forall (g1 g2 : Prop) (v x : term), x =u= Union [(g1, v); (g2, v)] <-> x =u= Union [(g1 \/ g2, v)].
