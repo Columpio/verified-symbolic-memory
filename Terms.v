@@ -208,7 +208,7 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. generalize dependent x.
   - admit.
   - destruct x.
     + admit.
-    + admit.
+    + admit. 
     + induction l as [|(gx, vx) gvsx]. admit. inversion_clear Hxy.
       destruct z.
       * admit.
