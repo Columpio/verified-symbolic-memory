@@ -1,2 +1,2 @@
 # verified-symbolic-memory
-Symbolic memory consistency proofs on Coq.
+Symbolic memory consistency proofs verified in Coq.
