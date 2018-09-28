@@ -110,6 +110,16 @@ where "x =u= y" := (union_equal x y).
 Hint Constructors semantically_equal.
 Hint Constructors union_equal.
 
+Inductive Disjoint : term -> Prop :=
+| disjoint_th : forall (t : th), Disjoint (Theory t)
+| disjoint_loc : forall (l : loc), Disjoint (Location l)
+| disjoint_union_nil : Disjoint (Union [])
+| disjoint_union_cons : forall (gvs : list (Prop * term)) (g1 : Prop) (v1 : term),
+  Disjoint (Union gvs) -> g1 ->
+  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2) -> Disjoint (Union ((g1, v1)::gvs)).
+Hint Constructors Disjoint.
+
+
 Axiom excluded_middle : forall P : Prop, P \/ ~ P.
 (* This axiom must only be used for guards, which occasionally are of type `Prop`.
    No "metatheoretic" usage is allowed *)
@@ -153,6 +163,26 @@ Instance semeq_is_symmetric : Symmetric semantically_equal.
 Proof. unfold Symmetric. intros x. induction x using term_ind; intros y Hxy; auto; destruct y; ueqtauto.
   - ueqtauto.
   - induction l as [|(g', v')]; ueqtauto.
+Qed.
+
+
+(* ----------------------------------Disjoint lemmas-------------------------------------- *)
+Lemma disjoint_unapp : forall (gvs gvs' : list (Prop * term)),
+  Disjoint (Union (gvs' ++ gvs)) -> Disjoint (Union gvs).
+Proof. intros gvs gvs' Hdisj. induction gvs' as [|(g', v')]. auto. apply IHgvs'.
+  rewrite <- app_comm_cons in Hdisj. inversion Hdisj; auto. Qed.
+
+Lemma disjoint_property : forall (gvs : list (Prop * term)),
+  Disjoint (Union gvs) -> forall (g1 g2 : Prop) (v1 v2 : term),
+    In (g1, v1) gvs -> In (g2, v2) gvs -> g1 -> g2 -> v1 =s= v2.
+Proof. intros gvs Hdisj g1 g2 v1 v2 H1 H2 Hg1 Hg2. apply in_split in H1 as [gvs1 [gvs2]]; subst.
+  apply in_app_or in H2 as [Hgvs1 | Hgvs2].
+  - apply in_split in Hgvs1 as [gvs1' [gvs1'']]; subst. rewrite <- app_assoc in Hdisj.
+    apply disjoint_unapp in Hdisj. rewrite <- app_comm_cons in Hdisj. inversion_clear Hdisj.
+    specialize (H1 g1 v1). symmetry. apply H1; auto. apply in_or_app. intuition.
+  - inversion_clear Hgvs2.
+    + inversion_clear H. reflexivity.
+    + apply disjoint_unapp in Hdisj. inversion_clear Hdisj. eauto.
 Qed.
 
 
