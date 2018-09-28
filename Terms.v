@@ -167,10 +167,14 @@ Qed.
 
 
 (* ----------------------------------Disjoint lemmas-------------------------------------- *)
+Lemma disjoint_uncons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  Disjoint (Union ((g, v)::gvs)) -> Disjoint (Union gvs).
+Proof. intros g v gvs Hdisj. inversion Hdisj. auto. Qed.
+
 Lemma disjoint_unapp : forall (gvs gvs' : list (Prop * term)),
   Disjoint (Union (gvs' ++ gvs)) -> Disjoint (Union gvs).
 Proof. intros gvs gvs' Hdisj. induction gvs' as [|(g', v')]. auto. apply IHgvs'.
-  rewrite <- app_comm_cons in Hdisj. inversion Hdisj; auto. Qed.
+  rewrite <- app_comm_cons in Hdisj. eauto using disjoint_uncons. Qed.
 
 Lemma disjoint_property : forall (gvs : list (Prop * term)),
   Disjoint (Union gvs) -> forall (g1 g2 : Prop) (v1 v2 : term),
@@ -206,10 +210,10 @@ Proof. intros g1 g2 v gvs. constructor.
 Qed.
 
 Theorem union_of_True : forall (t : term), Disjoint t -> Union [(True, t)] =s= t. (* TODO: the opposite direction *)
-Proof. intros t. induction t using term_ind.
-  4:{}. constructor. destruct (empty_union_dichotomy (Union ((g, t)::gvs))).
+Proof. intros t Hdisj. induction t using term_ind.
+  4:{}. constructor. destruct (empty_union_dichotomy (Union ((g, t)::gvs))) as [H | H].
   + inversion_clear H; auto.
-  + inversion_clear IHt0. destruct (empty_pair_dichotomy g t).
+  + inversion_clear Hdisj. specialize (IHt0 H0). inversion_clear IHt0. destruct (empty_pair_dichotomy g t).
     * apply uneq_ne_e; auto. unfold empty_pair in *. tauto. admit. (*transitivity*)
     * apply uneq_ne_ne_l; intuition ueqtauto. admit. admit.
 Admitted.
