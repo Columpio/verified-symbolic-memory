@@ -153,6 +153,14 @@ Lemma union_s_to_u : forall (gvs1 gvs2 : list (Prop * term)), Union gvs1 =s= Uni
 Proof. intuition ueqtauto. Qed.
 Hint Resolve union_s_to_u.
 
+Lemma super_lemma : forall (g : Prop) (v t : term) (gvs : list (Prop * term)),
+  Union ((g, v)::gvs) =s= t -> g /\ v =s= t \/ Union gvs =s= t.
+Proof. admit. Admitted.
+
+Lemma empty_union_equals : forall (t1 t2 : term), empty_union t1 -> t1 =s= t2 -> empty_union t2.
+Proof. intros t1 t2 Hempt1 Heq. induction t1 using term_ind. easy. easy. destruct t2; do 2 ueqtauto; easy.
+  apply super_lemma in Heq. inversion_clear Hempt1; tauto. Qed.
+
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Instance semeq_is_reflexive : Reflexive semantically_equal.
@@ -199,13 +207,17 @@ Proof. intros g v gvs Hng. constructor. generalize dependent v. generalize depen
 Qed.
 Hint Resolve empty_pair_cons.
 
-Theorem guard_squashing : forall (g1 g2 : Prop) (v : term) (gvs : list (Prop * term)),
-  Union ((g1, v)::(g2, v)::gvs) =s= Union ((g1 \/ g2, v)::gvs).
-Proof. intros g1 g2 v gvs. constructor.
-  destruct (excluded_middle g1); destruct (excluded_middle g2); destruct (empty_union_dichotomy v); auto 6.
+Theorem guard_squashing : forall (g1 g2 : Prop) (v1 v2 : term) (gvs : list (Prop * term)),
+  v1 =s= v2 -> Union ((g1, v1)::(g2, v2)::gvs) =s= Union ((g1 \/ g2, v1)::gvs).
+Proof. intros g1 g2 v1 v2 gvs Hvv. constructor.
+  destruct (excluded_middle g1); destruct (excluded_middle g2); destruct (empty_union_dichotomy v1); auto 6.
+  - eapply empty_union_equals in H1 as H2; eauto. auto 6.
   - apply uneq_ne_ne_r; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
+    apply H1. eapply empty_union_equals; eauto. all: symmetry; assumption.
   - apply uneq_ne_ne; intuition ueqtauto.
+  - eapply empty_union_equals in H1 as H2; eauto. auto 6.
   - apply uneq_e_ne; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
+    apply H1. eapply empty_union_equals; eauto. all: symmetry; assumption.
   - apply uneq_e_e; auto. constructor. tauto.
 Qed.
 
