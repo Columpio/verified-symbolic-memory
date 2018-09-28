@@ -156,7 +156,7 @@ Proof. unfold Symmetric. intros x. induction x using term_ind; intros y Hxy; aut
 Qed.
 
 
-(* ----------------------------------Common tests-------------------------------------- *)
+(* ----------------------------------Properties lemmas-------------------------------------- *)
 Theorem empty_pair_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
   empty_pair g v -> Union ((g, v)::gvs) =s= Union gvs.
 Proof. intros g v gvs Hng. constructor. generalize dependent v. generalize dependent g. induction gvs as [|(g', v')]; intros.
@@ -174,6 +174,16 @@ Proof. intros g1 g2 v gvs. constructor.
   - apply uneq_e_ne; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
   - apply uneq_e_e; auto. constructor. tauto.
 Qed.
+
+Theorem union_of_True : forall (t : term), Union [(True, t)] =s= t.
+Proof. intros t. induction t using term_ind.
+  4:{}. constructor. destruct (empty_union_dichotomy (Union ((g, t)::gvs))).
+  + inversion_clear H; auto.
+  + inversion_clear IHt0. destruct (empty_pair_dichotomy g t).
+    * apply uneq_ne_e; auto. unfold empty_pair in *. tauto. admit. (*transitivity*)
+    * apply uneq_ne_ne_l; intuition ueqtauto. admit. admit.
+Admitted.
+
 
 
 Lemma erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
@@ -264,16 +274,6 @@ Proof. intros gvs1 gvs2. split; intro H.
   - apply H. reflexivity.
 Qed.
 
-
-(* ----------------------------------Properties lemmas-------------------------------------- *)
-Lemma union_True : forall (t : term), Union [(True, t)] =s= t.
-Proof. intro t. constructor. apply uneq_cons. right. intros _. split.
-  - reflexivity.
-  - repeat constructor.
-Qed.
-
-Lemma union_false_erasing : forall (t : term) (gvs : list (Prop * term)), Union ((False, t) :: gvs) =s= Union gvs.
-Proof. intros t gvs. apply semeq_unionl. apply uneq_cons. left. intros _. reflexivity. Qed.
 
 Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
   Union ((g, Union xgvs) :: ygvs) =s= Union (map (fun '(g', v) => (g /\ g', v)) xgvs ++ ygvs).
