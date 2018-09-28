@@ -205,7 +205,7 @@ Proof. intros g1 g2 v gvs. constructor.
   - apply uneq_e_e; auto. constructor. tauto.
 Qed.
 
-Theorem union_of_True : forall (t : term), Union [(True, t)] =s= t.
+Theorem union_of_True : forall (t : term), Disjoint t -> Union [(True, t)] =s= t. (* TODO: the opposite direction *)
 Proof. intros t. induction t using term_ind.
   4:{}. constructor. destruct (empty_union_dichotomy (Union ((g, t)::gvs))).
   + inversion_clear H; auto.
