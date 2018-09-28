@@ -163,6 +163,18 @@ Proof. intros g v gvs Hng. constructor. generalize dependent v. generalize depen
   - destruct (excluded_middle g); ueqtauto.
   - destruct (empty_pair_dichotomy g v); destruct (empty_pair_dichotomy g' v'); auto.
 Qed.
+Hint Resolve empty_pair_cons.
+
+Theorem guard_squashing : forall (g1 g2 : Prop) (v : term) (gvs : list (Prop * term)),
+  Union ((g1, v)::(g2, v)::gvs) =s= Union ((g1 \/ g2, v)::gvs).
+Proof. intros g1 g2 v gvs. constructor.
+  destruct (excluded_middle g1); destruct (excluded_middle g2); destruct (empty_union_dichotomy v); auto 6.
+  - apply uneq_ne_ne_r; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
+  - apply uneq_ne_ne; intuition ueqtauto.
+  - apply uneq_e_ne; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
+  - apply uneq_e_e; auto. constructor. tauto.
+Qed.
+
 
 Lemma erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
   Union gvsx =u= Union gvsy -> empty_pair gy vy -> Union gvsx =u= Union ((gy, vy)::gvsy).
