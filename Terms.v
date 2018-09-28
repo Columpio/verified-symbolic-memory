@@ -215,7 +215,9 @@ Proof. intros t Hdisj. induction t using term_ind.
   + inversion_clear H; auto.
   + inversion_clear Hdisj. specialize (IHt0 H0). inversion_clear IHt0. destruct (empty_pair_dichotomy g t).
     * apply uneq_ne_e; auto. unfold empty_pair in *. tauto. admit. (*transitivity*)
-    * apply uneq_ne_ne_l; intuition ueqtauto. admit. admit.
+    * assert (Het: ~ empty_union t). { unfold empty_pair in H4. tauto. }
+      apply uneq_ne_ne_l; intuition ueqtauto; clear H H4.
+      ** 
 Admitted.
 
 
