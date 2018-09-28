@@ -61,9 +61,9 @@ Inductive empty_union : term -> Prop :=
 Hint Constructors empty_union.
 
 
-Reserved Notation "x =s= y" (at level 50).
-Reserved Notation "x =u= y" (at level 50).
-Reserved Notation "x =lu= y" (at level 50).
+Reserved Notation "x =s= y" (at level 70).
+Reserved Notation "x =u= y" (at level 70).
+Reserved Notation "x =lu= y" (at level 70).
 
 Definition empty_pair g v := ~g \/ empty_union v.
 Hint Unfold empty_pair.
@@ -207,15 +207,23 @@ Proof. intros g v gvs Hng. constructor. generalize dependent v. generalize depen
 Qed.
 Hint Resolve empty_pair_cons.
 
+Lemma erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
+  gvsx =u= gvsy -> empty_pair gy vy -> gvsx =u= (gy, vy)::gvsy.
+Proof. intros gy vy gvsx. generalize dependent gy. generalize dependent vy. induction gvsx as [|(gx, vx)]; intros.
+  - destruct (excluded_middle gy); do 2 ueqtauto.
+  - destruct (empty_pair_dichotomy gx vx); auto. constructor; auto.
+    induction gvsy as [|(gy', vy')]; inversion_clear H; intuition. constructor. inversion_clear H2; auto.
+Qed.
+
 Theorem guard_squashing : forall (g1 g2 : Prop) (v1 v2 : term) (gvs : list (Prop * term)),
   v1 =s= v2 -> Union ((g1, v1)::(g2, v2)::gvs) =s= Union ((g1 \/ g2, v1)::gvs).
 Proof. intros g1 g2 v1 v2 gvs Hvv. constructor.
   destruct (excluded_middle g1); destruct (excluded_middle g2); destruct (empty_union_dichotomy v1); auto 6.
-  - eapply empty_union_equals in H1 as H2; eauto. auto 6.
+  - eapply empty_union_equals in H1 as H2; eauto 10.
   - apply uneq_ne_ne_r; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
     apply H1. eapply empty_union_equals; eauto. all: symmetry; assumption.
   - apply uneq_ne_ne; intuition ueqtauto.
-  - eapply empty_union_equals in H1 as H2; eauto. auto 6.
+  - eapply empty_union_equals in H1 as H2; eauto 10.
   - apply uneq_e_ne; intuition ueqtauto. apply uneq_ne_ne; intuition ueqtauto.
     apply H1. eapply empty_union_equals; eauto. all: symmetry; assumption.
   - apply uneq_e_e; auto. constructor. tauto.
@@ -229,16 +237,13 @@ Proof. intros t Hdisj. induction t using term_ind.
     * apply uneq_ne_e; auto. unfold empty_pair in *. tauto. admit. (*transitivity*)
     * assert (Het: ~ empty_union t). { unfold empty_pair in H4. tauto. }
       apply uneq_ne_ne_l; intuition ueqtauto; clear H H4.
+      ** clear IHt H3. admit.
       ** 
 Admitted.
 
 
 
-Lemma erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
-  Union gvsx =u= Union gvsy -> empty_pair gy vy -> Union gvsx =u= Union ((gy, vy)::gvsy).
-Proof. admit. Admitted. (*intros gy vy gvsx gvsy Hueq Hemp. induction gvsx as [|(gx, vx)]. admit.
-  constructor. destruct (empty_pair_dichotomy gx vx).
-  - do 2 right. intuition.*)
+
 
 
 
