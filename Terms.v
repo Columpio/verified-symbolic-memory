@@ -71,14 +71,19 @@ Inductive Disjoint : term -> Prop :=
   Disjoint (Union gvs) -> ~ g -> Disjoint (Union ((g, v)::gvs))
 | disjoint_union_cons_ne : forall (gvs : list (Prop * term)) (g1 : Prop) (v1 : term),
   Disjoint (Union gvs) -> g1 -> Disjoint v1->
-  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2) -> Disjoint (Union ((g1, v1)::gvs))
+  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2 /\ v2 =s= v1) -> Disjoint (Union ((g1, v1)::gvs))
 with semantically_equal : relation term :=
 | semeq_union_empty : Union [] =s= Union []
-| semeq_union_nonempty : forall (gvsx gvsy : list (Prop * term)) (gx gy : Prop) (vx vy : term),
+| semeq_union_nonempty : forall (gvsx gvsy : list (Prop * term)),
   Disjoint (Union gvsx) -> Disjoint (Union gvsy) ->
+  (forall (gx : Prop) (vx : term), In (gx, vx) gvsx ->
+    exists (gy : Prop) (vy : term), In (gy, vy) gvsy /\ gy) ->
+  (forall (gy : Prop) (vy : term), In (gy, vy) gvsy ->
+    exists (gx : Prop) (vx : term), In (gx, vx) gvsx /\ gx) ->
+  (forall (gx gy : Prop) (vx vy : term),
   In (gx, vx) gvsx -> In (gy, vy) gvsy ->
   gx -> gy ->
-  vx =s= vy ->
+  vx =s= vy) ->
   Union gvsx =s= Union gvsy
 | semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
 | semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
@@ -92,12 +97,17 @@ with semantically_equal : relation term :=
   Location loc1 =lu= Union gvs -> Union gvs =s= Location loc1
 where "x =s= y" := (semantically_equal x y)
 with union_equal_linear : relation term :=
-| uneql : forall (g : Prop) (x v : term) (gvs : list (Prop * term)),
-  Disjoint (Union gvs) -> In (g, v) gvs -> g -> x =s= v -> x =lu= Union gvs
+| uneql : forall (x : term) (gvs : list (Prop * term)),
+  Disjoint (Union gvs) -> (forall (g : Prop) (v : term), In (g, v) gvs -> x =s= v) -> x =lu= Union gvs
 where "x =lu= y" := (union_equal_linear x y).
 Hint Constructors Disjoint.
 Hint Constructors union_equal_linear.
 Hint Constructors semantically_equal.
+
+Definition kek_eq x y := Disjoint x -> Disjoint y -> x =s= y.
+Notation "x =k= y" := (kek_eq x y) (at level 70).
+
+
 
 
 
@@ -147,14 +157,23 @@ Lemma equal_to_disjoint_r : forall (t1 t2 : term), t1 =s= t2 -> Disjoint t2.
 Proof. intros t1 t2 Heq. induction t2; auto. destruct t1; do 2 ueqtauto. Qed.
 
 
-(* ----------------------------------Relation lemmas-------------------------------------- *)
-Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. induction x; auto.
-  remember (equal_to_disjoint_l x x IHx) as Hdisjx.
-  remember (equal_to_disjoint_l (Union gvs) (Union gvs) IHx0) as Hdisjgvs.
-  assert (Hdisj: Disjoint (Union ((g, x) :: gvs))).
-  { destruct (excluded_middle g); usimpl_step; auto. }
-  econstructor.
+  (* ----------------------------------Relation lemmas-------------------------------------- *)
+Instance semeq_is_reflexive : Reflexive kek_eq.
+Proof. unfold Reflexive. unfold kek_eq. intros x HdisjBig _. induction x; auto.
+  econstructor; eauto. intros gx gy vx vy Hinx Hiny Hgx Hgy.
+  inversion_clear HdisjBig.
+  * inversion_clear Hinx.
+    - inversion H1; subst; clear H1. tauto.
+    - inversion_clear Hiny.
+      + inversion H2; subst; clear H2. tauto.
+      + specialize (IHx0 H). induction gvs as [|(g', v')]. easy. inversion_clear IHx0. eauto.
+  * inversion_clear Hinx.
+    - inversion H3; subst; clear H3. inversion_clear Hiny.
+      + inversion H3; subst; clear H3. auto.
+      + enough (vx =s= vy /\ vy =s= vx). tauto. eauto.
+    - inversion_clear Hiny.
+      + inversion H4; subst; clear H4. enough (vy =s= vx /\ vx =s= vy). tauto. eauto.
+      + specialize (IHx0 H). induction gvs as [|(g', v')]. easy. inversion_clear IHx0. eauto.
 Qed.
 Hint Resolve semeq_is_reflexive.
 
