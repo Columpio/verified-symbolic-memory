@@ -73,8 +73,10 @@ Inductive Disjoint : term -> Prop :=
   Disjoint (Union gvs) -> g1 -> Disjoint v1->
   (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2 /\ v2 =s= v1) -> Disjoint (Union ((g1, v1)::gvs))
 with semantically_equal : relation term :=
-| semeq_union_empty : Union [] =s= Union []
+| semeq_union_empty : forall (gvsx gvsy : list (Prop * term)),
+  empty_union (Union gvsx) -> empty_union (Union gvsy) -> Union gvsx =s= Union gvsy
 | semeq_union_nonempty : forall (gvsx gvsy : list (Prop * term)),
+  ~ empty_union (Union gvsx) -> ~ empty_union (Union gvsy) ->
   Disjoint (Union gvsx) -> Disjoint (Union gvsy) ->
   (forall (gx : Prop) (vx : term), In (gx, vx) gvsx ->
     exists (gy : Prop) (vy : term), In (gy, vy) gvsy /\ gy) ->
@@ -104,8 +106,8 @@ Hint Constructors Disjoint.
 Hint Constructors union_equal_linear.
 Hint Constructors semantically_equal.
 
-Definition kek_eq x y := Disjoint x -> Disjoint y -> x =s= y.
-Notation "x =k= y" := (kek_eq x y) (at level 70).
+Definition disjoint_eq x y := Disjoint x -> Disjoint y -> x =s= y.
+Notation "x =d= y" := (disjoint_eq x y) (at level 70).
 
 
 
@@ -156,24 +158,58 @@ Proof. intros t1 t2 Heq. induction t1; auto. destruct t2; do 2 ueqtauto. Qed.
 Lemma equal_to_disjoint_r : forall (t1 t2 : term), t1 =s= t2 -> Disjoint t2.
 Proof. intros t1 t2 Heq. induction t2; auto. destruct t1; do 2 ueqtauto. Qed.
 
+Lemma disjoint_non_empty : forall (gvs : list (Prop * term)),
+  Disjoint (Union gvs) -> ~ empty_union (Union gvs)
+  -> exists (gy : Prop) (vy : term), In (gy, vy) gvs /\ gy.
+Proof. intros gvs Hdisj Hne. induction gvs as [|(g, v)]. exfalso. intuition.
+  destruct (excluded_middle g). exists g, v. intuition.
+  assert (Hdisj': Disjoint (Union gvs)). { inversion Hdisj; assumption. }
+  assert (Hne': ~ empty_union (Union gvs)). { auto. }
+  enough (exists (gy : Prop) (vy : term), In (gy, vy) gvs /\ gy). destruct H0 as [gy [vy HH]].
+  exists gy, vy. intuition. tauto.
+Qed.
+
+Lemma in_empty_union : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  In (g, v) gvs -> empty_union (Union gvs) -> g -> empty_union v.
+Proof. intros g v gvs Hin He Hg. (*remember (Union gvs) as t.*)
+  generalize dependent g. generalize dependent v. induction gvs as [|(g', v')];
+  intros v g Hin Hg; inversion Hin.
+  - inversion H; subst; clear H. inversion_clear He. assumption. tauto.
+  - inversion_clear He; eauto.
+Qed.
+
+Lemma empty_unions_equal : forall (x y : term), empty_union x -> empty_union y -> x =s= y.
+Proof. intros x y Hex Hey. induction y; inversion Hey; induction x; inversion_clear Hex; auto. Qed.
+
+
 
   (* ----------------------------------Relation lemmas-------------------------------------- *)
-Instance semeq_is_reflexive : Reflexive kek_eq.
-Proof. unfold Reflexive. unfold kek_eq. intros x HdisjBig _. induction x; auto.
-  econstructor; eauto. intros gx gy vx vy Hinx Hiny Hgx Hgy.
-  inversion_clear HdisjBig.
+Instance semeq_is_reflexive : Reflexive disjoint_eq.
+Proof. unfold Reflexive. unfold disjoint_eq. intros x HdisjBig _. induction x; auto.
+  destruct (empty_union_dichotomy (Union ((g, x)::gvs))).
+  *** constructor; auto.
+  *** apply semeq_union_nonempty; auto.
+  ** intros gx vx Hinx. auto using disjoint_non_empty.
+  ** intros gy vy Hiny. auto using disjoint_non_empty.
+  ** intros gx gy vx vy Hinx Hiny Hgx Hgy. inversion_clear HdisjBig.
   * inversion_clear Hinx.
-    - inversion H1; subst; clear H1. tauto.
+    - inversion H2; subst; clear H2. tauto.
     - inversion_clear Hiny.
-      + inversion H2; subst; clear H2. tauto.
-      + specialize (IHx0 H). induction gvs as [|(g', v')]. easy. inversion_clear IHx0. eauto.
+      + inversion H3; subst; clear H3. tauto.
+      + specialize (IHx0 H0).
+        assert (Hne': ~ empty_union (Union gvs)). { auto. } clear H.
+        induction gvs as [|(g', v')]. easy. inversion_clear IHx0. tauto. eauto.
   * inversion_clear Hinx.
-    - inversion H3; subst; clear H3. inversion_clear Hiny.
-      + inversion H3; subst; clear H3. auto.
+    - inversion H4; subst; clear H4. inversion_clear Hiny.
+      + inversion H4; subst; clear H4. auto.
       + enough (vx =s= vy /\ vy =s= vx). tauto. eauto.
     - inversion_clear Hiny.
-      + inversion H4; subst; clear H4. enough (vy =s= vx /\ vx =s= vy). tauto. eauto.
-      + specialize (IHx0 H). induction gvs as [|(g', v')]. easy. inversion_clear IHx0. eauto.
+      + inversion H5; subst; clear H5. enough (vy =s= vx /\ vx =s= vy). tauto. eauto.
+      + specialize (IHx0 H0). specialize (IHx H2).
+        inversion_clear IHx0.
+        ++ clear x IHx H H2 H3 H1 g. remember (in_empty_union gx vx gvs H4 H6 Hgx) as H4'.
+          remember (in_empty_union gy vy gvs H5 H7 Hgy) as H5'. auto using empty_unions_equal.
+        ++ eauto.
 Qed.
 Hint Resolve semeq_is_reflexive.
 
