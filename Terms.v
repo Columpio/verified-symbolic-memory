@@ -189,16 +189,19 @@ Proof. intros t1 t2 Hempt1 Heq. induction t1 using term_ind. easy. easy. destruc
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. induction x using term_ind; ueqtauto. destruct (empty_pair_dichotomy g x); auto. Qed.
+Proof. unfold Reflexive. intro x. induction x; ueqtauto. destruct (empty_pair_dichotomy g x); auto. Qed.
 Hint Resolve semeq_is_reflexive.
 
 Instance semeq_is_symmetric : Symmetric semantically_equal.
-Proof. unfold Symmetric. intros x. induction x using term_ind; intros y Hxy; auto; destruct y; ueqtauto.
+Proof. unfold Symmetric. intros x. induction x; intros y Hxy; auto; destruct y; ueqtauto.
   induction l as [|(g', v')]; ueqtauto.
 Qed.
 
 Instance semeq_is_transitive : Transitive semantically_equal.
-Proof. admit. Admitted.
+Proof. unfold Transitive. intros x y z Hxy Hyz.
+  generalize dependent x. induction y.
+  4:{}. intros x Hxy. induction x. 4:{}. induction z. 4:{}.
+  admit. Admitted.
 
 
 (* ----------------------------------Disjoint lemmas-------------------------------------- *)
