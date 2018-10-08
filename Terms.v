@@ -61,17 +61,25 @@ Hint Constructors empty_union.
 
 
 Reserved Notation "x =s= y" (at level 70).
-Reserved Notation "x =u= y" (at level 70).
 Reserved Notation "x =lu= y" (at level 70).
 
-Definition empty_pair g v := ~g \/ empty_union v.
-Hint Unfold empty_pair.
-
-Inductive semantically_equal : relation term :=
-(*| semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
-| semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2*)
-(*| semeq_symm : forall (t1 t2 : term), t1 =s= t2 -> t2 =s= t1*)
-| semeq_union : forall (gvs1 gvs2 : list (Prop * term)), gvs1 =u= gvs2 -> Union gvs1 =s= Union gvs2
+Inductive Disjoint : term -> Prop :=
+| disjoint_th : forall (t : th), Disjoint (Theory t)
+| disjoint_loc : forall (l : loc), Disjoint (Location l)
+| disjoint_union_nil : Disjoint (Union [])
+| disjoint_union_cons_e : forall (gvs : list (Prop * term)) (g : Prop) (v : term),
+  Disjoint (Union gvs) -> ~ g -> Disjoint (Union ((g, v)::gvs))
+| disjoint_union_cons_ne : forall (gvs : list (Prop * term)) (g1 : Prop) (v1 : term),
+  Disjoint (Union gvs) -> g1 -> Disjoint v1->
+  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2) -> Disjoint (Union ((g1, v1)::gvs))
+with semantically_equal : relation term :=
+| semeq_union_empty : Union [] =s= Union []
+| semeq_union_nonempty : forall (gvsx gvsy : list (Prop * term)) (gx gy : Prop) (vx vy : term),
+  Disjoint (Union gvsx) -> Disjoint (Union gvsy) ->
+  In (gx, vx) gvsx -> In (gy, vy) gvsy ->
+  gx -> gy ->
+  vx =s= vy ->
+  Union gvsx =s= Union gvsy
 | semeq_th : forall (th1 th2 : th), th1 = th2 -> Theory th1 =s= Theory th2
 | semeq_loc : forall (loc1 loc2 : loc), loc1 = loc2 -> Location loc1 =s= Location loc2
 | semeq_th_u_l : forall (th1 : th) (gvs : list (Prop * term)),
@@ -85,40 +93,13 @@ Inductive semantically_equal : relation term :=
 where "x =s= y" := (semantically_equal x y)
 with union_equal_linear : relation term :=
 | uneql : forall (g : Prop) (x v : term) (gvs : list (Prop * term)),
-  g /\ x =s= v /\ (empty_union (Union gvs) \/ x =lu= Union gvs) \/ ~g /\ x =lu= Union gvs -> x =lu= Union ((g, v)::gvs)
-where "x =lu= y" := (union_equal_linear x y)
-with union_equal : relation (list (Prop * term)) :=
-| uneq_nil_l : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> gvs =u= []
-| uneq_nil_r : forall (gvs : list (Prop * term)), empty_union (Union gvs) -> [] =u= gvs
-| uneq_e_e : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  empty_pair g1 v1 -> empty_pair g2 v2 -> gvs1 =u= gvs2 -> ((g1, v1)::gvs1) =u= ((g2, v2)::gvs2)
-| uneq_e_ne : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  empty_pair g1 v1 -> ~ empty_pair g2 v2 -> gvs1 =u= ((g2, v2)::gvs2) -> ((g1, v1)::gvs1) =u= ((g2, v2)::gvs2)
-| uneq_ne_e : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  ~ empty_pair g1 v1 -> empty_pair g2 v2 -> ((g1, v1)::gvs1) =u= gvs2 -> ((g1, v1)::gvs1) =u= ((g2, v2)::gvs2)
-| uneq_ne_ne_l : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  ~ empty_pair g1 v1 -> ~ empty_pair g2 v2 -> v1 =s= v2 -> ((g1, v1)::gvs1) =u= gvs2
-  -> ((g1, v1)::gvs1) =u= ((g2, v2)::gvs2)
-| uneq_ne_ne_r : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  ~ empty_pair g1 v1 -> ~ empty_pair g2 v2 -> v1 =s= v2 -> gvs1 =u= ((g2, v2)::gvs2)
-  -> ((g1, v1)::gvs1) =u= ((g2, v2)::gvs2)
-| uneq_ne_ne : forall (g1 g2 : Prop) (v1 v2 : term) (gvs1 gvs2 : list (Prop * term)),
-  ~ empty_pair g1 v1 -> ~ empty_pair g2 v2 -> v1 =s= v2 -> gvs1 =u= gvs2
-  -> ((g1, v1)::gvs1) =u= ((g2, v2)::gvs2)
-where "x =u= y" := (union_equal x y).
-Hint Constructors semantically_equal.
-Hint Constructors union_equal.
-
-Inductive Disjoint : term -> Prop :=
-| disjoint_th : forall (t : th), Disjoint (Theory t)
-| disjoint_loc : forall (l : loc), Disjoint (Location l)
-| disjoint_union_nil : Disjoint (Union [])
-| disjoint_union_cons_e : forall (gvs : list (Prop * term)) (g : Prop) (v : term),
-  Disjoint (Union gvs) -> empty_pair g v -> Disjoint (Union ((g, v)::gvs))
-| disjoint_union_cons_ne : forall (gvs : list (Prop * term)) (g1 : Prop) (v1 : term),
-  Disjoint (Union gvs) -> ~ empty_pair g1 v1  -> Disjoint v1->
-  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2) -> Disjoint (Union ((g1, v1)::gvs)).
+  Disjoint (Union gvs) -> In (g, v) gvs -> g -> x =s= v -> x =lu= Union gvs
+where "x =lu= y" := (union_equal_linear x y).
 Hint Constructors Disjoint.
+Hint Constructors union_equal_linear.
+Hint Constructors semantically_equal.
+
+
 
 
 Axiom excluded_middle : forall P : Prop, P \/ ~ P.
@@ -127,18 +108,10 @@ Axiom excluded_middle : forall P : Prop, P \/ ~ P.
 
 
 (* ----------------------------------Technical lemmas-------------------------------------- *)
-Lemma not_empty_pair : forall (g : Prop) (v : term), ~ empty_pair g v -> g /\ ~ empty_union v.
-Proof. intros g v Hne. unfold empty_pair in Hne. destruct (excluded_middle g); tauto. Qed.
-
 Ltac usimpl_step :=
   try match goal with
-  | [ |- _ =s= _ ] => constructor
-  | [ |- context [ empty_pair _ _ ] ] => unfold empty_pair
-  | [ H: Union _ =s= Union _ |- _ ] => inversion_clear H
-  | [ H: ~ empty_pair _ _ |- _ ] => apply not_empty_pair in H; intuition
-  | [ H: empty_pair _ _ -> False |- _ ] => apply not_empty_pair in H; intuition
-  | [ H: empty_pair _ _ |- _ ] => inversion_clear H; intuition
-  | [ H: Disjoint (Union (_::_)) |- _ ] => inversion_clear H
+  | [ |- _ =s= _ ] => econstructor
+  | [ H: ?g |- Disjoint (Union ((?g, _)::_)) ] => eapply disjoint_union_cons_ne
   end.
 
 Ltac usimpl := repeat usimpl_step.
@@ -150,10 +123,7 @@ Ltac ueqtauto :=
   | [ H: Location _ =s= _ |- _ ] => inversion_clear H
   | [ H: _ =s= Location _ |- _ ] => inversion_clear H
   | [ H: Union _ =s= Union _ |- _ ] => inversion_clear H
-  | [ H: _ =lu= Union (_::_) |- _ ] => inversion_clear H
-  | [ H: (_::_) =u= (_::_) |- _ ] => inversion_clear H
-  | [ H: _ =u= [] |- _ ] => inversion_clear H
-  | [ H: [] =u= _ |- _ ] => inversion_clear H
+  | [ H: _ =lu= Union _ |- _ ] => inversion_clear H
   | _ => fail 1
   end; auto 6.
 
@@ -162,34 +132,30 @@ Proof. intros. induction t; try now right. auto.
   intuition; destruct (excluded_middle g); auto; right; intro Hfalse; inversion_clear Hfalse; tauto.
 Qed.
 
-Lemma empty_pair_dichotomy : forall (g : Prop) (v : term), empty_pair g v \/ ~ empty_pair g v.
-Proof. intros. usimpl. destruct (excluded_middle g); destruct (empty_union_dichotomy v); tauto. Qed.
-
-Lemma empty_union_empty_pair : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  empty_pair g v -> empty_union (Union gvs) -> empty_union (Union ((g, v)::gvs)).
-Proof. intros g v gvs Hep Heu. destruct (excluded_middle g); usimpl. Qed.
-Hint Resolve empty_union_empty_pair.
-
-Lemma empty_union_empty_pair_uncons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  empty_pair g v -> ~ empty_union (Union ((g, v)::gvs)) -> ~ empty_union (Union gvs).
-Proof. intros g v gvs Hneu Heu. destruct (excluded_middle g); usimpl. Qed.
-
-Lemma union_s_to_u : forall (gvs1 gvs2 : list (Prop * term)), Union gvs1 =s= Union gvs2 -> gvs1 =u= gvs2.
-Proof. intuition ueqtauto. Qed.
-Hint Resolve union_s_to_u.
-
-Lemma super_lemma : forall (g : Prop) (v t : term) (gvs : list (Prop * term)),
-  Union ((g, v)::gvs) =s= t -> g /\ v =s= t \/ Union gvs =s= t.
-Proof. admit. Admitted.
-
 Lemma empty_union_equals : forall (t1 t2 : term), empty_union t1 -> t1 =s= t2 -> empty_union t2.
-Proof. intros t1 t2 Hempt1 Heq. induction t1 using term_ind. easy. easy. destruct t2; do 2 ueqtauto; easy.
-  apply super_lemma in Heq. inversion_clear Hempt1; tauto. Qed.
+Proof. intros t1 t2 Hempt1 Heq. induction t1. easy. easy.
+  + clear Hempt1. destruct t2; do 2 ueqtauto; easy.
+  + inversion_clear Hempt1.
+  - admit.
+  - apply IHt0. assumption. admit.
+Admitted.
+
+Lemma equal_to_disjoint_l : forall (t1 t2 : term), t1 =s= t2 -> Disjoint t1.
+Proof. intros t1 t2 Heq. induction t1; auto. destruct t2; do 2 ueqtauto. Qed.
+
+Lemma equal_to_disjoint_r : forall (t1 t2 : term), t1 =s= t2 -> Disjoint t2.
+Proof. intros t1 t2 Heq. induction t2; auto. destruct t1; do 2 ueqtauto. Qed.
 
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Instance semeq_is_reflexive : Reflexive semantically_equal.
-Proof. unfold Reflexive. intro x. induction x using term_ind; ueqtauto. destruct (empty_pair_dichotomy g x); auto. Qed.
+Proof. unfold Reflexive. intro x. induction x; auto.
+  remember (equal_to_disjoint_l x x IHx) as Hdisjx.
+  remember (equal_to_disjoint_l (Union gvs) (Union gvs) IHx0) as Hdisjgvs.
+  assert (Hdisj: Disjoint (Union ((g, x) :: gvs))).
+  { destruct (excluded_middle g); usimpl_step; auto. }
+  econstructor.
+Qed.
 Hint Resolve semeq_is_reflexive.
 
 Instance semeq_is_symmetric : Symmetric semantically_equal.
