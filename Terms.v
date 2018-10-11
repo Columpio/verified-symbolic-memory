@@ -147,8 +147,6 @@ Proof. intros. induction t; try now right. auto.
   intuition; destruct (excluded_middle g); auto; right; intro Hfalse; inversion_clear Hfalse; tauto.
 Qed.
 
-(* Lemma empty_union_equals : forall (t1 t2 : term), empty_union t1 -> t1 =s= t2 -> empty_union t2. *)
-
 Lemma disjoint_non_empty : forall (gvs : list (Prop * term)),
   Disjoint (Union gvs) -> ~ empty_union (Union gvs)
   -> exists (gy : Prop) (vy : term), In (gy, vy) gvs /\ gy.
@@ -255,40 +253,31 @@ Instance semeq_is_transitive : Transitive semantically_equal.
 Proof. admit. Admitted.
 
 
-(* ----------------------------------Disjoint lemmas-------------------------------------- *)
-
-Lemma disjoint_property : forall (gvs : list (Prop * term)),
-  Disjoint (Union gvs) -> forall (g1 g2 : Prop) (v1 v2 : term),
-    In (g1, v1) gvs -> In (g2, v2) gvs -> ~ empty_pair g1 v1 -> ~ empty_pair g2 v2 -> v1 =s= v2.
-Proof. intros gvs Hdisj g1 g2 v1 v2 H1 H2 He1 He2. apply in_split in H1 as [gvs1 [gvs2]]; subst.
-  usimpl. apply in_app_or in H2 as [Hgvs1 | Hgvs2].
-  - apply in_split in Hgvs1 as [gvs1' [gvs1'']]; subst. rewrite <- app_assoc in Hdisj.
-    apply disjoint_unapp in Hdisj. rewrite <- app_comm_cons in Hdisj. usimpl.
-    specialize (H6 g1 v1). symmetry. apply H6. apply in_or_app. intuition. tauto.
-  - inversion_clear Hgvs2.
-    + inversion_clear H2. reflexivity.
-    + apply disjoint_unapp in Hdisj. usimpl. eauto.
-Qed.
-
-
 (* ----------------------------------Properties lemmas-------------------------------------- *)
-Lemma nempty_union_equals : forall (t1 t2 : term), ~ empty_union t1 -> t1 =s= t2 -> ~ empty_union t2.
-Proof. intros t1 t2 Hne1 Heq He2. apply Hne1. eapply empty_union_equals; eauto. symmetry. assumption. Qed.
+Lemma empty_union_equals : forall (t1 t2 : term), empty_union t1 -> t1 =s= t2 -> empty_union t2.
+Proof. admit. Admitted.
 
-Theorem empty_pair_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  empty_pair g v -> Union ((g, v)::gvs) =s= Union gvs.
+Lemma nempty_unions_equal : forall (t1 t2 : term), ~ empty_union t1 -> t1 =s= t2 -> ~ empty_union t2.
+Proof. admit. Admitted.
+  (* intros t1 t2 Hne1 Heq He2. apply Hne1. eapply empty_unions_equal; eauto. symmetry. assumption. Qed. *)
+
+(* Theorem empty_pair_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  ~ g -> Union ((g, v)::gvs) =s= Union gvs.
 Proof. intros g v gvs Hng. constructor. generalize dependent v. generalize dependent g. induction gvs as [|(g', v')]; intros.
   - destruct (excluded_middle g); ueqtauto.
   - destruct (empty_pair_dichotomy g v); destruct (empty_pair_dichotomy g' v'); auto.
 Qed.
-Hint Resolve empty_pair_cons.
+Hint Resolve empty_pair_cons. *)
 
-Lemma erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
-  gvsx =u= gvsy -> empty_pair gy vy -> gvsx =u= (gy, vy)::gvsy.
-Proof. intros gy vy gvsx. generalize dependent gy. generalize dependent vy. induction gvsx as [|(gx, vx)]; intros.
-  - destruct (excluded_middle gy); do 2 ueqtauto.
-  - destruct (empty_pair_dichotomy gx vx); auto. constructor; auto.
-    induction gvsy as [|(gy', vy')]; inversion_clear H; intuition. constructor. inversion_clear H2; auto.
+Hint Resolve in_inv.
+
+Theorem erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
+  ~ gy -> Union gvsx =d= Union gvsy -> Union gvsx =d= Union ((gy, vy)::gvsy).
+Proof. intros gy vy gvsx gvsy Hngy Heq. ueqtauto. remember (disjoint_uncons _ _ _ Hy) as Hy'. ueqtauto.
+  clear Hy' HeqHy'. inversion_clear H0; auto. constructor; auto.
+  + intuition. enough (exists (gy0 : Prop) (vy0 : term), In (gy0, vy0) gvsy /\ gy0); firstorder.
+  + firstorder congruence.
+  + firstorder. inversion H5; subst; tauto.
 Qed.
 
 Lemma unerase_empty_pair : forall (g : Prop) (v : term) (gvs gvs' : list (Prop * term)),
