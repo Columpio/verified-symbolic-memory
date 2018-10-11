@@ -132,13 +132,17 @@ Ltac usimpl := repeat usimpl_step.
 
 Ltac ueqtauto :=
   usimpl; repeat try match goal with
+  | [ H: (_, _) = (_, _) |- _ ] => inversion H; subst; clear H
   | [ H: ?g |- Disjoint (Union ((?g, _)::_)) ] => eapply disjoint_union_cons_ne
+  | [ H: In _ (_::_) |- _ ] =>
+    let Hx := fresh "Hx" in
+    let Hy := fresh "Hy" in
+    inversion_clear H as [Hx|Hy]; try (inversion Hx; subst; clear Hx)
   | [ H: _ =d= _ |- _ ] => unfold disjoint_eq in H
   | [ H: Theory _ =s= _ |- _ ] => inversion_clear H
   | [ H: _ =s= Theory _ |- _ ] => inversion_clear H
   | [ H: Location _ =s= _ |- _ ] => inversion_clear H
   | [ H: _ =s= Location _ |- _ ] => inversion_clear H
-  | [ H: Union _ =s= Union _ |- _ ] => inversion_clear H
   | [ H: _ =lu= Union _ |- _ ] => inversion_clear H
   end; intuition.
 
@@ -185,6 +189,7 @@ Qed.
 Lemma disjoint_uncons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
   Disjoint (Union ((g, v)::gvs)) -> Disjoint (Union gvs).
 Proof. intros g v gvs Hdisj. inversion_clear Hdisj; ueqtauto. Qed.
+Hint Resolve disjoint_uncons.
 
 Lemma disjoint_unapp : forall (gvs gvs' : list (Prop * term)),
   Disjoint (Union (gvs' ++ gvs)) -> Disjoint (Union gvs).
@@ -200,51 +205,29 @@ Proof. intros. apply in_split in H as [l1 [l2]]; subst. apply disjoint_unapp in 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Instance semeq_is_reflexive : Reflexive disjoint_eq.
 Proof. unfold Reflexive. unfold disjoint_eq. intros x HdisjBig _. induction x; auto.
-  destruct (empty_union_dichotomy (Union ((g, x)::gvs))); auto.
-  apply semeq_union_nonempty; auto.
-  ** intros gx vx Hinx. auto using disjoint_non_empty.
-  ** intros gy vy Hiny. auto using disjoint_non_empty.
-  ** intros gx gy vx vy Hinx Hiny Hgx Hgy. inversion_clear HdisjBig.
-  * inversion_clear Hinx.
-    - inversion H2; subst; clear H2. tauto.
-    - inversion_clear Hiny.
-      + inversion H3; subst; clear H3. tauto.
-      + specialize (IHx0 H0).
-        assert (Hne': ~ empty_union (Union gvs)). { auto. } clear H.
-        induction gvs as [|(g', v')]. easy. inversion_clear IHx0. eauto. tauto.
-  * inversion_clear Hinx.
-    - inversion H4; subst; clear H4. inversion_clear Hiny.
-      + inversion H4; subst; clear H4. auto.
-      + enough (vx =s= vy /\ vy =s= vx). tauto. eauto.
-    - inversion_clear Hiny.
-      + inversion H5; subst; clear H5. enough (vy =s= vx /\ vx =s= vy). tauto. eauto.
-      + specialize (IHx0 H0). specialize (IHx H2).
-        inversion_clear IHx0; eauto.
+  destruct (empty_union_dichotomy (Union ((g, x)::gvs))); auto. constructor; firstorder; ueqtauto;
+  inversion_clear HdisjBig; firstorder; match goal with [H: Union _ =s= Union _ |- _] => inversion_clear H end; firstorder eauto.
 Qed.
 Hint Resolve semeq_is_reflexive.
 
 Instance semeq_is_symmetric : Symmetric disjoint_eq.
-Proof. unfold Symmetric. intros x. induction x using term_ind; intros y Hxy.
+Proof. unfold Symmetric. intros x. induction x; intros y Hxy.
   - destruct y; do 2 ueqtauto.
   - destruct y; do 2 ueqtauto.
-  - destruct y; do 2 ueqtauto. clear H1 H2 H4 Hy H Hx.
+  - destruct y; do 2 ueqtauto; inversion_clear H0; ueqtauto. clear H1 H2 H4 Hy H Hx.
     assert (Hle: forall (gy : Prop) (vy : term), In (gy, vy) l -> ~ gy).
-    { firstorder. } clear H3. apply semeq_union_empty; auto. induction l as [|(g, v)]. auto.
-    apply empty_union_cons_false_guard. eauto. firstorder.
-  - destruct y; ueqtauto. ueqtauto. ueqtauto. inversion_clear H0; auto.
+    { firstorder. } clear H3. apply semeq_union_empty; auto. induction l as [|(g, v)]. auto. firstorder eauto.
+  - destruct y; do 2 ueqtauto. inversion_clear H0; auto.
     destruct (any_guard_dichotomy gvs) as [Hany|Hall].
     -- enough (Union l =s= Union gvs) as Htail.
       destruct (excluded_middle g).
-      + constructor; auto. intros. inversion_clear H6.
-        * inversion H9; subst; clear H9. apply IHx; eauto using disjoint_element.
+      + constructor; auto. do 2 ueqtauto.
+        * apply IHx; eauto using disjoint_element.
         * inversion_clear Htail; eauto.
-      + constructor; auto. intros. inversion_clear H6. congruence.
-        inversion_clear Htail; eauto.
-      + apply IHx0; auto.
-        * ueqtauto. constructor; auto. firstorder. firstorder.
-        * inversion H; auto.
-    -- constructor; auto. intros. inversion_clear H5.
-      + inversion H8; subst; clear H8. apply IHx; eauto using disjoint_element.
+      + constructor; auto. do 2 ueqtauto. inversion_clear Htail; eauto.
+      + apply IHx0; eauto. ueqtauto. constructor; auto; firstorder.
+    -- constructor; auto. do 2 ueqtauto.
+      + apply IHx; eauto using disjoint_element.
       + firstorder.
 Qed.
 Hint Resolve semeq_is_symmetric.
@@ -260,16 +243,6 @@ Proof. admit. Admitted.
 Lemma nempty_unions_equal : forall (t1 t2 : term), ~ empty_union t1 -> t1 =s= t2 -> ~ empty_union t2.
 Proof. admit. Admitted.
   (* intros t1 t2 Hne1 Heq He2. apply Hne1. eapply empty_unions_equal; eauto. symmetry. assumption. Qed. *)
-
-(* Theorem empty_pair_cons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  ~ g -> Union ((g, v)::gvs) =s= Union gvs.
-Proof. intros g v gvs Hng. constructor. generalize dependent v. generalize dependent g. induction gvs as [|(g', v')]; intros.
-  - destruct (excluded_middle g); ueqtauto.
-  - destruct (empty_pair_dichotomy g v); destruct (empty_pair_dichotomy g' v'); auto.
-Qed.
-Hint Resolve empty_pair_cons. *)
-
-Hint Resolve in_inv.
 
 Theorem erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
   ~ gy -> Union gvsx =d= Union gvsy -> Union gvsx =d= Union ((gy, vy)::gvsy).
