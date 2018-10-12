@@ -205,20 +205,17 @@ Hint Resolve disjoint_element.
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Instance disjoint_eq_is_symmetric : Symmetric disjoint_eq.
-Proof. unfold Symmetric. intros x. induction x; intros y Hxy.
-  - destruct y; do 2 ueqtauto.
-  - destruct y; do 2 ueqtauto.
-  - destruct y; do 2 ueqtauto; inversion_clear H0; ueqtauto. clear H1 H2 H4 Hy H Hx.
+Proof. unfold Symmetric. intros x. induction x; intros y Hxy; destruct y; do 2 ueqtauto; inversion_clear H0; auto.
+  - clear H1 H2 H4 Hy H Hx.
     assert (Hle: forall (gy : Prop) (vy : term), In (gy, vy) l -> ~ gy).
-    { firstorder. } clear H3. apply semeq_union_empty; auto. induction l as [|(g, v)]. auto. firstorder eauto.
-  - destruct y; do 2 ueqtauto. inversion_clear H0; auto.
-    destruct (any_guard_dichotomy gvs) as [Hany|Hall].
+    { firstorder. } clear H3. apply semeq_union_empty; auto. induction l as [|(g, v)]; auto. firstorder eauto.
+  - constructor; auto. destruct (any_guard_dichotomy gvs) as [Hany|Hall].
     -- enough (Union l =s= Union gvs) as Htail.
-      + constructor; auto. do 2 ueqtauto.
+      + do 2 ueqtauto.
         * apply IHx; eauto.
         * inversion_clear Htail; eauto.
       + apply IHx0; auto. ueqtauto. constructor; firstorder. eauto.
-    -- constructor; auto. do 2 ueqtauto.
+    -- do 2 ueqtauto.
       + apply IHx; eauto.
       + firstorder.
 Qed.
