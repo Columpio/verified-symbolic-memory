@@ -73,7 +73,7 @@ Inductive Disjoint : term -> Prop :=
   Disjoint (Union gvs) -> ~ g -> Disjoint (Union ((g, v)::gvs))
 | disjoint_union_cons_ne : forall (gvs : list (Prop * term)) (g1 : Prop) (v1 : term),
   Disjoint (Union gvs) -> g1 -> Disjoint v1->
-  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2 /\ v2 =s= v1) -> Disjoint (Union ((g1, v1)::gvs))
+  (forall (g2 : Prop) (v2 : term), In (g2, v2) gvs -> g2 -> v1 =s= v2) -> Disjoint (Union ((g1, v1)::gvs))
 with semantically_equal : relation term :=
 | semeq_union_nonempty : forall (gvsx gvsy : list (Prop * term)),
   Disjoint (Union gvsx) -> Disjoint (Union gvsy) ->
@@ -200,17 +200,11 @@ Lemma disjoint_element : forall (g : Prop) (v : term) (gvs : list (Prop * term))
   In (g, v) gvs -> g -> Disjoint (Union gvs) -> Disjoint v.
 Proof. intros. apply in_split in H as [l1 [l2]]; subst. apply disjoint_unapp in H1.
   inversion_clear H1; ueqtauto. Qed.
+Hint Resolve disjoint_element.
 
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
-Instance semeq_is_reflexive : Reflexive disjoint_eq.
-Proof. unfold Reflexive. unfold disjoint_eq. intros x HdisjBig _. induction x; auto.
-  destruct (empty_union_dichotomy (Union ((g, x)::gvs))); auto. constructor; firstorder; ueqtauto;
-  inversion_clear HdisjBig; firstorder; match goal with [H: Union _ =s= Union _ |- _] => inversion_clear H end; firstorder eauto.
-Qed.
-Hint Resolve semeq_is_reflexive.
-
-Instance semeq_is_symmetric : Symmetric disjoint_eq.
+Instance disjoint_eq_is_symmetric : Symmetric disjoint_eq.
 Proof. unfold Symmetric. intros x. induction x; intros y Hxy.
   - destruct y; do 2 ueqtauto.
   - destruct y; do 2 ueqtauto.
@@ -230,7 +224,17 @@ Proof. unfold Symmetric. intros x. induction x; intros y Hxy.
       + apply IHx; eauto using disjoint_element.
       + firstorder.
 Qed.
-Hint Resolve semeq_is_symmetric.
+Hint Resolve disjoint_eq_is_symmetric.
+
+Instance disjoint_eq_is_reflexive : Reflexive disjoint_eq.
+Proof. unfold Reflexive. unfold disjoint_eq. intros x HdisjBig _. induction x; auto.
+  destruct (empty_union_dichotomy (Union ((g, x)::gvs))); auto. constructor; firstorder; ueqtauto;
+  inversion_clear HdisjBig; firstorder; match goal with [H: Union _ =s= Union _ |- _] => inversion_clear H end; eauto;
+  enough (vx =d= vy); eauto.
+Qed.
+Hint Resolve disjoint_eq_is_reflexive.
+
+
 
 Instance semeq_is_transitive : Transitive semantically_equal.
 Proof. admit. Admitted.
