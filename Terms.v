@@ -154,15 +154,17 @@ Proof. intros. induction t; try now right. auto.
   intuition; destruct (excluded_middle g); auto; right; intro Hfalse; inversion_clear Hfalse; tauto.
 Qed.
 
+Lemma disjoint_uncons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  Disjoint (Union ((g, v)::gvs)) -> Disjoint (Union gvs).
+Proof. intros g v gvs Hdisj. inversion_clear Hdisj; ueqtauto. Qed.
+Hint Resolve disjoint_uncons.
+
 Lemma disjoint_non_empty : forall (gvs : list (Prop * term)),
   Disjoint (Union gvs) -> ~ empty_union (Union gvs)
   -> exists (gy : Prop) (vy : term), In (gy, vy) gvs /\ gy.
 Proof. intros gvs Hdisj Hne. induction gvs as [|(g, v)]. exfalso. intuition.
-  destruct (excluded_middle g). exists g, v. intuition.
-  assert (Hdisj': Disjoint (Union gvs)). { inversion Hdisj; assumption. }
-  assert (Hne': ~ empty_union (Union gvs)). { auto. }
-  enough (exists (gy : Prop) (vy : term), In (gy, vy) gvs /\ gy). destruct H0 as [gy [vy HH]].
-  exists gy, vy. intuition. tauto.
+  destruct (excluded_middle g). firstorder eauto.
+  assert (Hdisj': Disjoint (Union gvs)). { eauto. } firstorder.
 Qed.
 
 Lemma in_empty_union : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
@@ -170,7 +172,7 @@ Lemma in_empty_union : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
 Proof. intros g v gvs Hin He Hg. (*remember (Union gvs) as t.*)
   generalize dependent g. generalize dependent v. induction gvs as [|(g', v')];
   intros v g Hin Hg; inversion Hin.
-  - inversion H; subst; clear H. inversion_clear He. assumption. tauto.
+  - ueqtauto; inversion_clear He; intuition. 
   - inversion_clear He; eauto.
 Qed.
 Hint Resolve in_empty_union.
@@ -188,11 +190,6 @@ Proof. intros gvs. induction gvs as [|(g, v)].
     + left. exists g, v. intuition.
     + firstorder congruence.
 Qed.
-
-Lemma disjoint_uncons : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  Disjoint (Union ((g, v)::gvs)) -> Disjoint (Union gvs).
-Proof. intros g v gvs Hdisj. inversion_clear Hdisj; ueqtauto. Qed.
-(* Hint Resolve disjoint_uncons. *)
 
 Lemma disjoint_unapp : forall (gvs gvs' : list (Prop * term)),
   Disjoint (Union (gvs' ++ gvs)) -> Disjoint (Union gvs).
