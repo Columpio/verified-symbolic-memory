@@ -214,14 +214,12 @@ Proof. unfold Symmetric. intros x. induction x; intros y Hxy.
   - destruct y; do 2 ueqtauto. inversion_clear H0; auto.
     destruct (any_guard_dichotomy gvs) as [Hany|Hall].
     -- enough (Union l =s= Union gvs) as Htail.
-      destruct (excluded_middle g).
       + constructor; auto. do 2 ueqtauto.
-        * apply IHx; eauto using disjoint_element.
+        * apply IHx; eauto.
         * inversion_clear Htail; eauto.
-      + constructor; auto. do 2 ueqtauto. inversion_clear Htail; eauto.
-      + apply IHx0; eauto. ueqtauto. constructor; auto; firstorder.
+      + apply IHx0; auto. ueqtauto. constructor; firstorder. eauto.
     -- constructor; auto. do 2 ueqtauto.
-      + apply IHx; eauto using disjoint_element.
+      + apply IHx; eauto.
       + firstorder.
 Qed.
 Hint Resolve disjoint_eq_is_symmetric.
@@ -233,7 +231,6 @@ Proof. unfold Reflexive. unfold disjoint_eq. intros x HdisjBig _. induction x; a
   enough (vx =d= vy); eauto.
 Qed.
 Hint Resolve disjoint_eq_is_reflexive.
-
 
 
 Instance semeq_is_transitive : Transitive semantically_equal.
