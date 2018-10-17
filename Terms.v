@@ -197,9 +197,9 @@ Proof. intros gvs gvs' Hdisj. induction gvs' as [|(g', v')]. auto. apply IHgvs'.
   rewrite <- app_comm_cons in Hdisj. eauto using disjoint_uncons. Qed.
 
 Lemma disjoint_element : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  In (g, v) gvs -> g -> Disjoint (Union gvs) -> Disjoint v.
-Proof. intros. apply in_split in H as [l1 [l2]]; subst. apply disjoint_unapp in H1.
-  inversion_clear H1; ueqtauto. Qed.
+  Disjoint (Union gvs) -> g -> In (g, v) gvs -> Disjoint v.
+Proof. intros. apply in_split in H1 as [l1 [l2]]; subst. apply disjoint_unapp in H.
+  inversion_clear H; ueqtauto. Qed.
 Hint Resolve disjoint_element.
 
 
@@ -251,15 +251,20 @@ Qed.
 Theorem guard_squashing : forall (g1 g2 : Prop) (v1 v2 : term) (gvs : list (Prop * term)),
   v1 =d= v2 -> Union ((g1, v1)::(g2, v2)::gvs) =d= Union ((g1 \/ g2, v2)::gvs).
 Proof. intros g1 g2 v1 v2 gvs Hvv. ueqtauto.
-    destruct (excluded_middle g1).
-  - constructor; eauto. intros. ueqtauto_step.
-    + clear H3. ueqtauto_step.
-      ++ apply Hvv. eauto. eapply disjoint_element with (g := gx \/ g2); eauto.
+  constructor; eauto.
+  - intros. ueqtauto; firstorder eauto.
+  - intros. ueqtauto; firstorder eauto. exists g2, vy; intuition.
+  - intros. ueqtauto_step.
+    + ueqtauto_step.
+      ++ eauto.
       ++ ueqtauto_step.
-        +++ assert (Disjoint vx). { eapply disjoint_element with (g := g1 \/ gx); eauto. } 
-          apply disjoint_eq_is_reflexive; auto.
-        +++ 
-  - destruct (excluded_middle g2).
+        +++ apply disjoint_eq_is_reflexive; eauto.
+        +++ eapply disjoint_property with (gvs := (g1 \/ g2, vy) :: gvs) (gx := gx); intuition.
+    + ueqtauto_step.
+      ++ eapply disjoint_property with (gvs := (gx, vx) :: (g2, v2) :: gvs) (gy := gy); intuition.
+      ++ ueqtauto_step.
+        +++ eapply disjoint_property with (gvs := (g1, v1) :: (gx, vx) :: gvs) (gx := gx) (gy := gy); intuition.
+        +++ eapply disjoint_property; eauto.
 Qed.
 
 Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
