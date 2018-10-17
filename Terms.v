@@ -203,6 +203,8 @@ Proof. intros. apply in_split in H as [l1 [l2]]; subst. apply disjoint_unapp in 
 Hint Resolve disjoint_element.
 
 
+
+
 (* ----------------------------------Relation lemmas-------------------------------------- *)
 Instance disjoint_eq_is_symmetric : Symmetric disjoint_eq.
 Proof. unfold Symmetric. intros x y Hxy. ueqtauto. induction H0; ueqtauto. eauto. Qed.
@@ -216,6 +218,14 @@ Proof. unfold Reflexive. intros x. ueqtauto. induction Hx; intuition; constructo
 Qed.
 Hint Resolve disjoint_eq_is_reflexive.
 
+Lemma disjoint_property : forall (gx gy : Prop) (vx vy : term) (gvs : list (Prop * term)),
+  In (gx, vx) gvs -> gx -> In (gy, vy) gvs -> gy -> Disjoint (Union gvs) -> vx =s= vy.
+Proof. intros. induction gvs as [|(g, v)]. easy. ueqtauto.
+  - apply disjoint_eq_is_reflexive; eauto.
+  - inversion_clear H3; intuition. apply disjoint_eq_is_symmetric; eauto.
+  - inversion_clear H3. tauto. eauto.
+  - eauto.
+Qed.
 
 Instance semeq_is_transitive : Transitive semantically_equal.
 Proof. admit. Admitted.
@@ -241,14 +251,14 @@ Qed.
 Theorem guard_squashing : forall (g1 g2 : Prop) (v1 v2 : term) (gvs : list (Prop * term)),
   v1 =d= v2 -> Union ((g1, v1)::(g2, v2)::gvs) =d= Union ((g1 \/ g2, v2)::gvs).
 Proof. intros g1 g2 v1 v2 gvs Hvv. ueqtauto.
-  assert (Hrefl: forall (g g' : Prop) (v : term), Disjoint (Union ((g \/ g', v)::gvs)) -> g -> g' -> v =s= v).
-  { eauto. }
-  destruct (excluded_middle g1).
+    destruct (excluded_middle g1).
   - constructor; eauto. intros. ueqtauto_step.
     + clear H3. ueqtauto_step.
       ++ apply Hvv. eauto. eapply disjoint_element with (g := gx \/ g2); eauto.
       ++ ueqtauto_step.
-        +++ eapply disjoint_element with (g := g1 \/ gx); eauto.
+        +++ assert (Disjoint vx). { eapply disjoint_element with (g := g1 \/ gx); eauto. } 
+          apply disjoint_eq_is_reflexive; auto.
+        +++ 
   - destruct (excluded_middle g2).
 Qed.
 
