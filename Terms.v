@@ -321,6 +321,32 @@ Proof. intros t l v H1. induction v; intros; ueqtauto. firstorder.
     + destruct H4 as [g0 [v0]]. do 2 ueqtauto. firstorder.
 Qed.
 
+Lemma th_transitive : forall (t : th) (x y : term), Theory t =s= x -> Theory t =s= y -> x =s= y.
+Proof. intros t x y Hx. generalize dependent y. induction x; intros; ueqtauto. firstorder.
+  constructor; auto. intros. ueqtauto.
+  - eauto.
+  - enough (Union gvs =s= Union gvs0). inversion_clear H0. eapply H13; eauto. eauto.
+    apply IHx0; ueqtauto. do 2 constructor. eauto. exists gx, vx; auto. eauto.
+Qed.
+
+Lemma loc_loc_transitive : forall (loc1 loc2 : loc) (t : term),
+  Location loc1 =s= t -> Location loc2 =s= t -> loc1 = loc2.
+Proof. intros loc1 loc2 t H1. induction t; intros; ueqtauto. firstorder.
+  destruct (excluded_middle g).
+  - apply IHt; eauto.
+  - destruct (any_guard_dichotomy gvs).
+    + apply IHt0; do 2 constructor; eauto.
+    + destruct H4 as [g0 [v0]]. do 2 ueqtauto. firstorder.
+Qed.
+
+Lemma loc_transitive : forall (t : loc) (x y : term), Location t =s= x -> Location t =s= y -> x =s= y.
+Proof. intros t x y Hx. generalize dependent y. induction x; intros; ueqtauto. firstorder.
+  constructor; auto. intros. ueqtauto.
+  - eauto.
+  - enough (Union gvs =s= Union gvs0). inversion_clear H0. eapply H13; eauto. eauto.
+    apply IHx0; ueqtauto. do 2 constructor. eauto. exists gx, vx; auto. eauto.
+Qed.
+
 Instance semeq_is_transitive : Transitive disjoint_eq.
 Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
   rename x1 into y, x0 into z, d0 into Hy, d into Hz.
@@ -330,20 +356,8 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
     (* assert (Hney: ~ empty_union y). { eauto using nempty_unions_equals. } *)
     (* assert (Hnez: ~ empty_union z). { eauto using nempty_unions_equals. } *)
     clear Hnex.
-
-  
-  
-  
     generalize dependent x.
-    (* induction y as [thy|locy|HHH|HHH].
-    * induction z as [thz|locz|HHH|gz vz gvsz IHz IHgvsz]; try easy.
-      ** firstorder. inversion_clear Hyz; subst. auto.
-      ** ueqtauto. firstorder.
-      ** intros. inversion_clear Hxy; subst; auto. ueqtauto. constructor; auto. intros gx gz' vx vz'. intros.
-        ueqtauto.
-        ***  *)
-
-  induction Hyz as [gvsy gvsz _ _ Hyexz Hzexy Hyz Hind|gvsy gvsz|HHH|HHH|thy gvsz Hyz|thz gvsy Hyz HHH|locy gvsz Hyz|locz gvsy Hyz];
+  induction Hyz as [gvsy gvsz _ _ Hyexz Hzexy Hyz Hind|gvsy gvsz|HHH|HHH|thy gvsz Hyz|thz gvsy Hyz|locy gvsz Hyz|locz gvsy Hyz];
   try congruence.
   * intros x Hx Hxy. inversion Hxy; subst.
     + constructor; auto. firstorder eauto. firstorder eauto. intros gx gz vx vz Hinx Hinz Hgx Hgz.
@@ -355,7 +369,7 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
     + constructor. clear Hxy. ueqtauto. firstorder. constructor; auto. firstorder. intros.
       eapply Hind; eauto.
   * eauto using empty_union_equals.
-  * intros x Hdisjx Hxy. admit.
+  * intros x Hdisjx Hxy. eauto using th_transitive.
   * intros x Hdisjx Hxy. apply semeq_th_u_r in Hyz. induction Hxy; try easy; try congruence.
     ** do 2 constructor; auto; ueqtauto.
       *** firstorder.
@@ -364,15 +378,17 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
     ** constructor. eauto using th_th_transitive.
     ** ueqtauto.
     ** exfalso. eauto using th_loc_not_transitive.
-    
-    induction x.
-    ** constructor. ueqtauto. admit.
-    ** exfalso. ueqtauto.
-      
-      admit. inversion Hxy; subst; clear Hxy.
-    ** do 2 constructor. auto. firstorder.
-  induction y.
-  - rename x into y. clear Hy. intros. 
+  * intros x Hdisjx Hxy. eauto using loc_transitive.
+  * intros x Hdisjx Hxy. apply semeq_loc_u_r in Hyz. induction Hxy; try easy; try congruence.
+    ** do 2 constructor; auto; ueqtauto.
+      *** firstorder.
+      *** apply semeq_is_symmetric. eauto. auto. destruct H7 as [gy' [vy' [Hin' Hgy']]]. eapply H4; eauto.
+    ** eauto using empty_union_equals.
+    ** exfalso. eauto using th_loc_not_transitive.
+    ** constructor. eauto using loc_loc_transitive.
+    ** ueqtauto.
+Qed.
+
 
 
 (* ----------------------------------Properties lemmas-------------------------------------- *)
