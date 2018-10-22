@@ -301,6 +301,16 @@ Proof. intros.
   ueqtauto. inversion_clear H4; eauto.
 Qed.
 
+Lemma th_th_transitive : forall (th1 th2 : th) (t : term),
+  Theory th1 =s= t -> Theory th2 =s= t -> th1 = th2.
+Proof. intros th1 th2 t H1. induction t; intros; ueqtauto. congruence. firstorder.
+  destruct (excluded_middle g).
+  - apply IHt; eauto.
+  - destruct (any_guard_dichotomy gvs).
+    + apply IHt0; do 2 constructor; eauto.
+    + destruct H4 as [g0 [v0]]. do 2 ueqtauto. firstorder.
+Qed.
+
 Instance semeq_is_transitive : Transitive disjoint_eq.
 Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
   rename x1 into y, x0 into z, d0 into Hy, d into Hz.
@@ -336,7 +346,16 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
       eapply Hind; eauto.
   * eauto using empty_union_equals.
   * intros x Hdisjx Hxy. admit.
-  * intros x Hdisjx Hxy. ueqtauto. inversion Hxy; subst; clear Hxy.
+  * intros x Hdisjx Hxy. apply semeq_th_u_r in Hyz. induction Hxy; try easy; try congruence.
+    ** admit.
+    ** eauto using empty_union_equals.
+    ** ueqtauto.
+    
+    induction x.
+    ** constructor. ueqtauto. admit.
+    ** exfalso. ueqtauto.
+      
+      admit. inversion Hxy; subst; clear Hxy.
     ** do 2 constructor. auto. firstorder.
   induction y.
   - rename x into y. clear Hy. intros. 
