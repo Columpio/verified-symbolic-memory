@@ -155,7 +155,7 @@ Ltac ueqtauto_step :=
   end.
 
 Ltac ueqtauto :=
-  usimpl; repeat ueqtauto_step; simpl in *; intuition.
+  usimpl; repeat ueqtauto_step; subst; simpl in *; intuition.
 
 Lemma empty_union_dichotomy : forall (t : term), empty_union t \/ ~ empty_union t.
 Proof. intros. induction t; try now right. auto.
@@ -303,11 +303,21 @@ Qed.
 
 Lemma th_th_transitive : forall (th1 th2 : th) (t : term),
   Theory th1 =s= t -> Theory th2 =s= t -> th1 = th2.
-Proof. intros th1 th2 t H1. induction t; intros; ueqtauto. congruence. firstorder.
+Proof. intros th1 th2 t H1. induction t; intros; ueqtauto. firstorder.
   destruct (excluded_middle g).
   - apply IHt; eauto.
   - destruct (any_guard_dichotomy gvs).
     + apply IHt0; do 2 constructor; eauto.
+    + destruct H4 as [g0 [v0]]. do 2 ueqtauto. firstorder.
+Qed.
+
+Lemma th_loc_not_transitive : forall (t : th) (l : loc) (v : term),
+  Theory t =s= v -> Location l =s= v -> False.
+Proof. intros t l v H1. induction v; intros; ueqtauto. firstorder.
+  destruct (excluded_middle g).
+  - apply IHv; eauto.
+  - destruct (any_guard_dichotomy gvs).
+    + apply IHv0; do 2 constructor; eauto.
     + destruct H4 as [g0 [v0]]. do 2 ueqtauto. firstorder.
 Qed.
 
@@ -347,9 +357,13 @@ Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
   * eauto using empty_union_equals.
   * intros x Hdisjx Hxy. admit.
   * intros x Hdisjx Hxy. apply semeq_th_u_r in Hyz. induction Hxy; try easy; try congruence.
-    ** admit.
+    ** do 2 constructor; auto; ueqtauto.
+      *** firstorder.
+      *** apply semeq_is_symmetric. eauto. auto. destruct H7 as [gy' [vy' [Hin' Hgy']]]. eapply H4; eauto.
     ** eauto using empty_union_equals.
+    ** constructor. eauto using th_th_transitive.
     ** ueqtauto.
+    ** exfalso. eauto using th_loc_not_transitive.
     
     induction x.
     ** constructor. ueqtauto. admit.
