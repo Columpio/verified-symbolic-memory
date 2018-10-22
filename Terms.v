@@ -239,12 +239,6 @@ Proof. intros x y Hxy. induction Hxy; ueqtauto. Qed.
 Lemma disjoint_dichotomy : forall (x : term), Disjoint x \/ ~ Disjoint x.
 Proof. admit. Admitted.
 
-Lemma first_equal : forall (g : Prop) (t1 t2 : term) (gvs : list (Prop * term)),
-  Union ((g, t1)::gvs) =s= t2 -> g -> t1 =s= t2 \/ t2 =s= t1.
-Proof. intros. induction t2. ueqtauto. firstorder eauto. ueqtauto. firstorder eauto.
-  - inversion_clear H. exfalso. destruct (H3 g t1); auto. firstorder. left. eauto.
-  - admit. Admitted.
-
 Lemma linear_equal_not_empty_th : forall (th1 : th) (t : term),
     Theory th1 =s= t -> empty_union t -> False.
 Proof. intros th1 t Heq Hemp. induction t; try easy; ueqtauto. firstorder. firstorder.
@@ -278,7 +272,6 @@ Proof. intros t1 t2 He1 Heq. induction Heq; try easy.
   - exfalso. eauto using linear_equal_not_empty_th.
   - exfalso. eauto using linear_equal_not_empty_loc.
 Qed.
-
 
 
 (* ----------------------------------Relation lemmas-------------------------------------- *)
