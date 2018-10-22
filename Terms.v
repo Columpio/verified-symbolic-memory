@@ -236,8 +236,8 @@ Proof. intros x y Hxy. induction Hxy; ueqtauto. Qed.
 
 (* Lemma extract_property : forall (x : {}) *)
 
-Lemma disjoint_dichotomy : forall (x : term), Disjoint x \/ ~ Disjoint x.
-Proof. admit. Admitted.
+(* Lemma disjoint_dichotomy : forall (x : term), Disjoint x \/ ~ Disjoint x.
+Proof. admit. Admitted. *)
 
 Lemma linear_equal_not_empty_th : forall (th1 : th) (t : term),
     Theory th1 =s= t -> empty_union t -> False.
