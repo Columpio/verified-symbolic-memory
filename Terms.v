@@ -139,6 +139,7 @@ Ltac usimpl := repeat usimpl_step.
 
 Ltac ueqtauto_step :=
   try match goal with
+  | [ x: DisjointTerm |- _ ] => destruct x
   | [ x: {_ : term | Disjoint _} |- _ ] => destruct x
   | [ H: (_, _) = (_, _) |- _ ] => inversion H; subst; clear H
   | [ H: ?g |- Disjoint (Union ((?g, _)::_)) ] => eapply disjoint_union_cons_ne
@@ -292,7 +293,11 @@ Proof. unfold Reflexive. intros x. ueqtauto. induction d; auto; constructor; fir
   - enough (Disjoint vx); eauto.
   - inversion_clear IHd1; eauto.
 Qed.
-Hint Resolve disjoint_eq_is_reflexive.
+(* Hint Resolve disjoint_eq_is_reflexive. *)
+
+Lemma semeq_is_reflexive : forall (x : term), Disjoint x -> x =s= x.
+Proof. intros x Hdx. enough (exist Disjoint x Hdx =d= exist Disjoint x Hdx). auto. reflexivity. Qed.
+Hint Resolve semeq_is_reflexive.
 
 Lemma disjoint_property : forall (gx gy : Prop) (vx vy : term) (gvs : list (Prop * term)),
   In (gx, vx) gvs -> gx -> In (gy, vy) gvs -> gy -> Disjoint (Union gvs) -> vx =s= vy.
@@ -394,17 +399,19 @@ Proof. intros gy vy gvsx gvsy Hngy Heq. inversion_clear Heq; auto. constructor; 
   + firstorder; congruence.
 Qed.
 
-Theorem guard_squashing : forall (g1 g2 : Prop) (v1 v2 : term) (gvs : list (Prop * term)),
-  v1 =d= v2 -> Union ((g1, v1)::(g2, v2)::gvs) =d= Union ((g1 \/ g2, v2)::gvs).
-Proof. intros g1 g2 v1 v2 gvs Hvv. ueqtauto.
-  constructor; eauto.
-  - intros. ueqtauto; firstorder eauto.
-  - intros. ueqtauto; firstorder eauto. exists g2, vy; intuition.
-  - intros. ueqtauto_step.
+Theorem guard_squashing : forall (g1 g2 : Prop) (v1 v2 : DisjointTerm) (gvs : list (Prop * term)),
+  Disjoint (Union ((g1, extract v1)::(g2, extract v2)::gvs)) ->
+  Disjoint (Union ((g1 \/ g2, extract v2)::gvs)) ->
+  v1 =d= v2 -> Union ((g1, extract v1)::(g2, extract v2)::gvs) =s= Union ((g1 \/ g2, extract v2)::gvs).
+Proof. intros g1 g2 v1 v2 gvs Hl Hr Hvv. ueqtauto. rename x0 into v1, x into v2.
+  constructor; auto; intros.
+  - ueqtauto. exists (gx \/ g2), v2; auto. exists (g1 \/ gx), vx; auto. exists gx, vx; auto.
+  - ueqtauto; firstorder eauto. exists g2, vy; auto.
+  - ueqtauto_step.
     + ueqtauto_step.
       ++ eauto.
       ++ ueqtauto_step.
-        +++ apply disjoint_eq_is_reflexive; eauto.
+        +++ auto. 
         +++ eapply disjoint_property with (gvs := (g1 \/ g2, vy) :: gvs) (gx := gx); intuition.
     + ueqtauto_step.
       ++ eapply disjoint_property with (gvs := (gx, vx) :: (g2, v2) :: gvs) (gy := gy); intuition.
