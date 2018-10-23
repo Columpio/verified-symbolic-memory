@@ -350,12 +350,6 @@ Qed.
 Instance semeq_is_transitive : Transitive disjoint_eq.
 Proof. unfold Transitive. intros x y z Hxy Hyz. ueqtauto.
   rename x1 into y, x0 into z, d0 into Hy, d into Hz.
-  destruct (empty_union_dichotomy x) as [H|Hnex].
-  - eauto using empty_union_equals, empty_unions_are_equal.
-  -
-    (* assert (Hney: ~ empty_union y). { eauto using nempty_unions_equals. } *)
-    (* assert (Hnez: ~ empty_union z). { eauto using nempty_unions_equals. } *)
-    clear Hnex.
     generalize dependent x.
   induction Hyz as [gvsy gvsz _ _ Hyexz Hzexy Hyz Hind|gvsy gvsz|HHH|HHH|thy gvsz Hyz|thz gvsy Hyz|locy gvsz Hyz|locz gvsy Hyz];
   try congruence.
@@ -393,10 +387,9 @@ Qed.
 
 (* ----------------------------------Properties lemmas-------------------------------------- *)
 Theorem erase_empty_pair : forall (gy : Prop) (vy : term) (gvsx gvsy : list (Prop * term)),
-  ~ gy -> Union gvsx =d= Union gvsy -> Union gvsx =d= Union ((gy, vy)::gvsy).
-Proof. intros gy vy gvsx gvsy Hngy Heq. ueqtauto. remember (disjoint_uncons _ _ _ Hy) as Hy'. ueqtauto.
-  clear Hy' HeqHy'. inversion_clear H0; auto. constructor; auto.
-  + intuition. enough (exists (gy0 : Prop) (vy0 : term), In (gy0, vy0) gvsy /\ gy0); firstorder.
+  ~ gy -> Union gvsx =s= Union gvsy -> Union gvsx =s= Union ((gy, vy)::gvsy).
+Proof. intros gy vy gvsx gvsy Hngy Heq. inversion_clear Heq; auto. constructor; auto.
+  + intuition. enough (exists (gy0 : Prop) (vy0 : term), In (gy0, vy0) gvsy /\ gy0). firstorder. eauto.
   + firstorder; congruence.
   + firstorder; congruence.
 Qed.
