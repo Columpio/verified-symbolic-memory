@@ -445,7 +445,7 @@ Definition InTerm gv t :=
   | _ => False
   end.
 
-Lemma equal_to_disjoint_union : forall (g : Prop) (v t : term),
+Lemma equal_to_disjoint : forall (g : Prop) (v t : term),
   Disjoint t -> InTerm (g, v) t -> g -> v =s= t.
 Proof. intros g v t Hdisj Hin Hg.
   generalize dependent v. generalize dependent g.
@@ -473,15 +473,22 @@ Proof. intros g v t Hdisj Hin Hg.
         * do 2 constructor. auto. eauto. do 2 ueqtauto.
           ** eapply disjoint_property with (gvs:=(g1, v) :: gvs); eauto using in_cons.
           ** etransitivity. eapply IHt0. inversion Hdisj; auto. exact Hg. auto. eauto.
-        * constructor; auto. eauto using disjoint_element. eauto. assert (Heq: Union l =s= Union gvs). { eauto. }
-          do 2 ueqtauto.
-          ** inversion_clear Heq; intuition.
-            specialize (H7 gx vx H2 H4) as [g' [v' [Hin' Hg']]].
+        * constructor; auto. eapply disjoint_element with (g:=g0) (gvs:=gvs); auto. eauto. eauto.
+          assert (Heq: Union l =s= Union gvs). { eauto. }
+          do 2 ueqtauto; inversion_clear Heq; intuition.
+          ** specialize (H7 gx vx H2 H4) as [g' [v' [Hin' Hg']]].
             etransitivity. eapply H9. eauto. eauto. auto. auto.
             eapply disjoint_property with (gvs:=(gy, vy)::gvs). eauto using in_cons. eauto. eauto. auto. auto.
-          ** inversion_clear Heq. eauto. tauto.
+          ** eauto.
   - intros. inversion_clear Hin; ueqtauto. eauto using erase_empty_pair.
 Qed.
+
+Lemma equal_to_disjoint_union : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
+  Disjoint (Union gvs) -> In (g, v) gvs -> g -> v =s= Union gvs.
+Proof. eauto using equal_to_disjoint. Qed.
+
+Theorem union_of_true : forall (g : Prop) (v : term), g -> Disjoint v -> v =s= Union [(g, v)].
+Proof. intros g v Hg Hdisj. eapply equal_to_disjoint_union; intuition. Qed.
 
 Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
   Disjoint (Union ((g, Union xgvs) :: ygvs)) ->
