@@ -489,6 +489,54 @@ Proof. eauto using equal_to_disjoint. Qed.
 
 Theorem union_of_true : forall (g : Prop) (v : term), g -> Disjoint v -> v =s= Union [(g, v)].
 Proof. intros g v Hg Hdisj. eapply equal_to_disjoint_union; intuition. Qed.
+(* 
+  induction d; auto; constructor; firstorder ueqtauto.
+  - inversion_clear IHd; eauto.
+  - inversion_clear IHd1; eauto. *)
+
+Lemma conjunctive_disjoint : forall (g : Prop) (gvs : list (Prop * term)),
+  g -> Disjoint (Union gvs) -> Disjoint (Union (map (fun '(g', v') => (g /\ g', v')) gvs)).
+Proof. intros g gvs Hg Hdisj. induction gvs as [|(g', v')]. auto. simpl.
+  inversion_clear Hdisj. constructor; tauto. apply disjoint_union_cons_ne; auto. intros.
+  rewrite in_map_iff in H3. destruct H3 as [(g1, v1)]. do 2 ueqtauto. eauto.
+Qed.
+
+Lemma conjuntive_reflexivity : forall (g : Prop) (gvs : list (Prop * term)),
+  Disjoint (Union gvs) -> g -> Union (map (fun '(g', v') => (g /\ g', v')) gvs) =s= Union gvs.
+Proof. intros g gvs Hdisj Hg. induction gvs as [|(gx, vx)]. auto.
+  inversion_clear Hdisj; intuition.
+  - apply erase_empty_pair. auto. symmetry. apply erase_empty_pair. tauto. auto.
+  - constructor; auto.
+    + auto using conjunctive_disjoint.
+    + eauto.
+    + simpl. eauto 6.
+    + simpl. intros. do 2 ueqtauto. eauto. rewrite in_map_iff in H8. destruct H8 as [(g1, v1)].
+      do 2 ueqtauto. eauto. rewrite in_map_iff in H8. destruct H8 as [(g1, v1)]. do 2 ueqtauto. eauto.
+Qed.
+
+Lemma head_union_unfolding : forall (g : Prop) (gvsx : list (Prop * term)),
+  Disjoint (Union gvsx) ->
+  Union [(g, Union gvsx)] =s= Union (map (fun '(g', v) => (g /\ g', v)) gvsx).
+Proof. intros g gvsx Hdisj.
+  destruct (excluded_middle g) as [Hg|Hg].
+    -- destruct (empty_union_dichotomy (Union gvsx)).
+      + apply semeq_union_empty. destruct (excluded_middle g); auto.
+        induction gvsx as [|(gx, vx)]. auto.
+        simpl. destruct (excluded_middle (g /\ gx)).
+        * constructor; auto. inversion H; tauto. eauto.
+        * eauto.
+      + constructor; auto.
+        * apply disjoint_union_cons_ne; easy.
+        * auto using conjunctive_disjoint.
+        * intros. ueqtauto. apply non_empty_hence_exists. eauto using conjuntive_reflexivity, nempty_unions_equals.
+        * eauto.
+        * do 2 ueqtauto. symmetry.
+          etransitivity. instantiate (1:=Union (map (fun '(g', v) => (gx /\ g', v)) gvsx)).
+          eapply equal_to_disjoint_union. auto using conjunctive_disjoint. eauto. auto.
+          eauto using conjuntive_reflexivity.
+    -- apply semeq_union_empty. auto. induction gvsx as [|(gx, vx)]. auto.
+      simpl. apply empty_union_cons_false_guard. tauto. inversion_clear Hdisj; auto.
+Qed.
 
 Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
   Disjoint (Union ((g, Union xgvs) :: ygvs)) ->
@@ -497,21 +545,8 @@ Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
 Proof. intros g gvsx gvsy Hdisjl Hdisjr.
   destruct gvsy.
   - rewrite app_nil_r in *.
-    destruct (excluded_middle g) as [Hg|Hg].
-    -- destruct (empty_union_dichotomy (Union gvsx)).
-      + apply semeq_union_empty. destruct (excluded_middle g); auto.
-        clear Hdisjl Hdisjr.
-        induction gvsx as [|(gx, vx)]. auto.
-        simpl. destruct (excluded_middle (g /\ gx)).
-        * constructor; auto. inversion H; tauto. eauto.
-        * eauto.
-      + constructor; auto.
-        * intros. ueqtauto. apply non_empty_hence_exists. intros Hemp. apply H. clear Hdisjl Hdisjr H H1.
-          induction gvsx as [|(g, v)]. auto. inversion_clear Hemp; ueqtauto.
-        * intros. exists g, (Union gvsx). auto.
-        * do 2 ueqtauto.
-    -- apply semeq_union_empty. auto. clear Hdisjl Hdisjr. induction gvsx as [|(gx, vx)]. auto.
-      simpl. apply empty_union_cons_false_guard. tauto. auto.
+    
+  - 
   
   admit. Admitted.
 
