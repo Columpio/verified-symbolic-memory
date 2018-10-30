@@ -1,15 +1,9 @@
 Require Export Id.
-Require Import Coq.Program.Wf.
-Import Wf.WfExtensionality.
+Require Import Coq.Lists.List.
+Import List.ListNotations.
 Require Import Coq.Relations.Relation_Definitions.
 Require Import Coq.Classes.RelationClasses.
-Require Import Coq.Lists.List.
-Require Import Coq.Program.Wf.
-Require Import FunInd.
-Require Import Recdef.
 Require Import Coq.Program.Equality.
-(* From QuickChick Require Import QuickChick. *)
-Import List.ListNotations.
 Unset Intuition Negation Unfolding.
 Hint Resolve in_eq.
 
@@ -238,9 +232,6 @@ Proof. intros x y Hxy. induction Hxy; ueqtauto. Qed.
 
 Lemma eq_to_disj2 : forall (x y : term), x =s= y -> Disjoint y.
 Proof. intros x y Hxy. induction Hxy; ueqtauto. Qed.
-
-(* Lemma disjoint_dichotomy : forall (x : term), Disjoint x \/ ~ Disjoint x.
-Proof. admit. Admitted. *)
 
 Lemma linear_equal_not_empty_th : forall (th1 : th) (t : term),
     Theory th1 =s= t -> empty_union t -> False.
