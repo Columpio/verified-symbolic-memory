@@ -130,6 +130,11 @@ Axiom excluded_middle : forall P : Prop, P \/ ~ P.
 
 
 (* ----------------------------------Technical lemmas-------------------------------------- *)
+Lemma in_app_comm : forall {A : Type} (gvsx gvsy : list A) (gv : A),
+  In gv (gvsy ++ gvsx) -> In gv (gvsx ++ gvsy).
+Proof. intros A gvsx gvsy gv Hin. apply in_app_iff. rewrite in_app_iff in Hin. tauto. Qed.
+Hint Resolve in_app_comm.
+
 Ltac usimpl_step :=
   try match goal with
   (* | [ |- _ =s= _ ] => econstructor *)
@@ -303,6 +308,33 @@ Lemma disjoint_property : forall (gx gy : Prop) (vx vy : term) (gvs : list (Prop
 Proof. intros.
   enough (exist Disjoint (Union gvs) H3 =d= exist Disjoint (Union gvs) H3); auto.
   ueqtauto. inversion_clear H4; eauto.
+Qed.
+
+Lemma back_disjoint_property : forall (gvs : list (Prop * term)),
+  (forall (g : Prop) (v : term), In (g, v) gvs -> g -> Disjoint v) ->
+  (forall (gx gy : Prop) (vx vy : term), In (gx, vx) gvs -> gx -> In (gy, vy) gvs -> gy -> vx =s= vy) ->
+  Disjoint (Union gvs).
+Proof. intros gvs Hdisj Hprop. induction gvs as [|(g', v')]. auto.
+  destruct (excluded_middle g').
+  - apply disjoint_union_cons_ne; auto.
+    + apply IHgvs; eauto using in_cons.
+    + eauto.
+    + eauto using in_cons.
+  - constructor; auto. apply IHgvs; eauto using in_cons.
+Qed.
+
+Lemma disjoint_unin : forall (g : Prop) (v : term) (gvs1 gvs2 : list (Prop * term)),
+  Disjoint (Union (gvs1 ++ (g, v) :: gvs2)) -> Disjoint (Union (gvs1 ++ gvs2)).
+Proof. intros g v gvs1 gvs2 Hdisj.
+  assert (Hpop: forall (g' : Prop) (v' : term), In (g', v') (gvs1 ++ gvs2) -> In (g', v') (gvs1 ++ (g, v) :: gvs2)).
+  { intros g' v' Hin. apply in_app_or in Hin as [H|H]; auto using in_or_app, in_cons. }
+  apply back_disjoint_property. eauto using disjoint_element. eauto using disjoint_property.
+Qed.
+
+Lemma disjoint_comm : forall (gvsx gvsy : list (Prop * term)),
+  Disjoint (Union (gvsx ++ gvsy)) -> Disjoint (Union (gvsy ++ gvsx)).
+Proof. intros gvsx gvsy Hdisj. apply back_disjoint_property.
+  eauto using disjoint_element. eauto using disjoint_property.
 Qed.
 
 Lemma th_th_transitive : forall (th1 th2 : th) (t : term),
@@ -487,12 +519,40 @@ Lemma equal_to_disjoint_union : forall (g : Prop) (v : term) (gvs : list (Prop *
   Disjoint (Union gvs) -> In (g, v) gvs -> g -> v =s= Union gvs.
 Proof. eauto using equal_to_disjoint. Qed.
 
+Theorem reorder_union : forall (gvsx gvsy : list (Prop * term)),
+Disjoint (Union (gvsx ++ gvsy)) -> Union (gvsx ++ gvsy) =s= Union (gvsy ++ gvsx).
+Proof. intros gvsx gvsy Hdisj.
+  destruct (empty_union_dichotomy (Union (gvsx ++ gvsy))).
+  - apply empty_unions_are_equal. auto. rewrite empty_union_property in H. apply empty_union_property. eauto.
+  - apply non_empty_hence_exists in H as [gy [vy [Hin Hgy]]]. etransitivity.
+    + symmetry. eapply equal_to_disjoint_union; eauto.
+    + eapply equal_to_disjoint_union; eauto using disjoint_comm.
+Qed.
+
+Theorem erase_empty_in : forall (gy : Prop) (x vy : term) (gvs1 gvs2 : list (Prop * term)),
+  ~ gy -> x =s= Union (gvs1 ++ (gy, vy)::gvs2) -> x =s= Union (gvs1 ++ gvs2).
+Proof. intros gy x vy gvs1 gvs2 Hngy Heq. etransitivity.
+  - instantiate (1:=Union (gvs1 ++ (gy, vy) :: gvs2)). auto.
+  - etransitivity. instantiate (1:=Union ((gy, vy) :: gvs2 ++ gvs1)).
+    + apply reorder_union. eauto using eq_to_disj2.
+    + enough (Disjoint (Union (gvs2 ++ gvs1))). etransitivity. instantiate (1:=Union (gvs2 ++ gvs1)).
+      symmetry. apply erase_empty_pair_from_union; auto. auto using reorder_union.
+      apply disjoint_comm. eapply disjoint_unin. eauto using eq_to_disj2.
+Qed.
+
+Theorem erase_empty_in_back : forall (gy : Prop) (x vy : term) (gvs1 gvs2 : list (Prop * term)),
+  ~ gy -> x =s= Union (gvs1 ++ gvs2) -> x =s= Union (gvs1 ++ (gy, vy)::gvs2).
+Proof. intros gy x vy gvs1 gvs2 Hngy Heq. etransitivity.
+  - instantiate (1:=Union (gvs1 ++ gvs2)). auto.
+  - etransitivity. instantiate (1:=Union (gvs2 ++ gvs1)).
+    + apply reorder_union. eauto using eq_to_disj2.
+    + enough (Disjoint (Union (gvs2 ++ gvs1))). etransitivity. instantiate (1:=Union (((gy, vy)::gvs2) ++ gvs1)).
+      apply erase_empty_pair_from_union; auto. apply reorder_union. simpl. auto.
+      apply disjoint_comm. eauto using eq_to_disj2.
+Qed.
+
 Theorem union_of_true : forall (g : Prop) (v : term), g -> Disjoint v -> v =s= Union [(g, v)].
 Proof. intros g v Hg Hdisj. eapply equal_to_disjoint_union; intuition. Qed.
-(* 
-  induction d; auto; constructor; firstorder ueqtauto.
-  - inversion_clear IHd; eauto.
-  - inversion_clear IHd1; eauto. *)
 
 Lemma conjunctive_disjoint : forall (g : Prop) (gvs : list (Prop * term)),
   g -> Disjoint (Union gvs) -> Disjoint (Union (map (fun '(g', v') => (g /\ g', v')) gvs)).
@@ -538,21 +598,29 @@ Proof. intros g gvsx Hdisj.
       simpl. apply empty_union_cons_false_guard. tauto. inversion_clear Hdisj; auto.
 Qed.
 
-Lemma union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
+Theorem union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
   Disjoint (Union ((g, Union xgvs) :: ygvs)) ->
   Disjoint (Union (map (fun '(g', v) => (g /\ g', v)) xgvs ++ ygvs)) ->
   Union ((g, Union xgvs) :: ygvs) =s= Union (map (fun '(g', v) => (g /\ g', v)) xgvs ++ ygvs).
 Proof. intros g gvsx gvsy Hdisjl Hdisjr.
-  destruct gvsy.
-  - rewrite app_nil_r in *.
-    
-  - 
-  
-  admit. Admitted.
-
-
-
-
+  destruct (excluded_middle g).
+  + induction gvsy as [|(gy, vy)].
+    - rewrite app_nil_r in *. eauto using head_union_unfolding.
+    - destruct (excluded_middle gy).
+      * etransitivity.
+        ** symmetry. eapply equal_to_disjoint_union with (g := gy); eauto using in_cons.
+        ** eapply equal_to_disjoint_union; eauto using in_or_app, in_cons.
+      * replace (Union ((g, Union gvsx) :: (gy, vy) :: gvsy)) with (Union ([(g, Union gvsx)] ++ (gy, vy) :: gvsy)) in *; auto.
+        etransitivity. symmetry. eapply erase_empty_in_back; auto. instantiate (1:=Union ([(g, Union gvsx)] ++ gvsy)).
+        eauto using disjoint_unin. etransitivity. simpl. apply IHgvsy.
+        replace (Union ((g, Union gvsx) :: gvsy)) with (Union ([(g, Union gvsx)] ++ gvsy)); auto.
+        eauto using disjoint_unin. eauto using disjoint_unin.
+        eapply erase_empty_in_back; auto. apply disjoint_unin in Hdisjr. auto.
+  + symmetry. apply erase_empty_pair; auto. induction gvsx as [|(gx, vx)]. auto.
+    simpl. symmetry. apply erase_empty_pair. tauto. symmetry. apply IHgvsx.
+    * constructor; auto. inversion_clear Hdisjl; auto.
+    * simpl in Hdisjr. inversion_clear Hdisjr; auto.
+Qed.
 
 
 
