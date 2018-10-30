@@ -605,7 +605,7 @@ Theorem union_unfolding : forall (g : Prop) (xgvs ygvs : list (Prop * term)),
 Proof. intros g gvsx gvsy Hdisjl Hdisjr.
   destruct (excluded_middle g).
   + induction gvsy as [|(gy, vy)].
-    - rewrite app_nil_r in *. eauto using head_union_unfolding.
+    - rewrite app_nil_r in *. apply head_union_unfolding. inversion_clear Hdisjl; tauto.
     - destruct (excluded_middle gy).
       * etransitivity.
         ** symmetry. eapply equal_to_disjoint_union with (g := gy); eauto using in_cons.
@@ -614,62 +614,10 @@ Proof. intros g gvsx gvsy Hdisjl Hdisjr.
         etransitivity. symmetry. eapply erase_empty_in_back; auto. instantiate (1:=Union ([(g, Union gvsx)] ++ gvsy)).
         eauto using disjoint_unin. etransitivity. simpl. apply IHgvsy.
         replace (Union ((g, Union gvsx) :: gvsy)) with (Union ([(g, Union gvsx)] ++ gvsy)); auto.
-        eauto using disjoint_unin. eauto using disjoint_unin.
+        eauto using disjoint_unin. eapply disjoint_unin. eassumption.
         eapply erase_empty_in_back; auto. apply disjoint_unin in Hdisjr. auto.
   + symmetry. apply erase_empty_pair; auto. induction gvsx as [|(gx, vx)]. auto.
     simpl. symmetry. apply erase_empty_pair. tauto. symmetry. apply IHgvsx.
-    * constructor; auto. inversion_clear Hdisjl; auto.
-    * simpl in Hdisjr. inversion_clear Hdisjr; auto.
+    * constructor; auto. eauto using disjoint_uncons.
+    * simpl in Hdisjr. eauto using disjoint_uncons.
 Qed.
-
-
-
-
-
-
-
-
-
-
-
-Lemma cons_equal : forall (g : Prop) (v1 v2 : term) (gvs : list (Prop * term)),
-  v1 =s= v2 -> (g, v1)::gvs =u= (g, v2)::gvs.
-Proof. intros g v1 v2 gvs Heq.
-  destruct (empty_pair_dichotomy g v1) as [He1 | Hne1].
-  - destruct (excluded_middle g); usimpl. remember (empty_union_equals v1 v2 H0 Heq) as He2. auto.
-  - enough (Hne2: ~ empty_pair g v2). auto. destruct (excluded_middle g); usimpl. eapply nempty_union_equals; eauto.
-Qed.
-
-(* Lemma equal_guards : forall (gvs gvs' : list (Prop * term)) (f : Prop -> Prop),
-  (forall x, f x <-> x) -> gvs' = map (fun '(g, v) => (f g, v)) gvs -> gvs =u= gvs'.
-Proof. intros gvs gvs' f Hf Hgvs'. generalize dependent gvs'. induction gvs as [|(g, v)].
-  - admit.
-  - intros gvs' Hgvs'. subst. simpl.
-
-Theorem union_of_true' : forall (t : term), Union [(True, t)] =s= t.
-Proof. intros t. induction t using term_ind.
-  4:{}. remember (union_unfolding True ((g, t) :: gvs) []) as Hu. simpl in Hu. admit. (*transitivity*)
-Admitted. *)
-
-(* Theorem union_of_True' : forall (v : term), Disjoint v -> Union [(True, v)] =s= v. *)
-
-Theorem union_of_True : forall (g : Prop) (v : term) (gvs : list (Prop * term)),
-  Disjoint (Union ((g, v)::gvs)) -> ~ empty_pair g v -> Union ((g, v)::gvs) =s= v. (* TODO: the opposite direction *)
-Proof. intros g v. generalize dependent g.
-  induction v as [v|v|_|g' v' gvs' IHv IHgvs]; intros g gvs Hdisj Hne. (* 3:{}. exfalso. auto. *)
-  4:{}. usimpl_step. destruct (empty_pair_dichotomy g' v').
-  - usimpl_step. apply erase_empty_pair; auto. assert (Hl: (g, Union gvs') :: gvs =u= (g, Union ((g', v') :: gvs')) :: gvs).
-    { apply cons_equal. symmetry. apply empty_pair_cons. assumption. } apply semeq_union in Hl. symmetry in Hl.
-    apply union_s_to_u. etransitivity; eauto. clear Hl.
-    apply IHgvs.
-    + clear IHv IHgvs. apply empty_union_empty_pair_uncons in H1; auto.
-      inversion_clear Hdisj. unfold empty_pair in H3. intuition. inversion_clear H4; usimpl.
-      apply disjoint_union_cons_ne; auto.
-      ++ usimpl.
-      ++ usimpl.
-      ++ intros g2 v2 Hin Hg2. specialize (H5 g2 v2 Hin Hg2). eapply unerase_empty_pair_s; eauto.
-    + usimpl.
-  - do 2 usimpl_step.
-    assert (Hval: Union ((g', v')::gvs') =s= v'). { apply IHv; usimpl. }
-    usimpl_step. usimpl. clear H4. usimpl_step. usimpl. clear H7. admit.
-Admitted.
